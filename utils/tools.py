@@ -1,12 +1,45 @@
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-import time
+from typing import Optional
+import os
 
 plt.switch_backend('agg')
 
 
-def adjust_learning_rate(optimizer, epoch, args):
+def adjust_learning_rate(optimizer: torch.optim.Optimizer,
+                         epoch: int, args):
+    """
+    Parameters
+    ----------
+    optimizer : torch.optim.Optimizer
+        The optimizer whose learning rate will be adjusted.
+    epoch : int
+        The current epoch of training.
+    args : object
+        should have the following attributes:
+        - `learning_rate` : float
+            The initial learning rate for the optimizer.
+        - `lradj` : str
+            The learning rate adjustment strategy. Options include:
+            - `'type1'` : Halve the learning rate every epoch.
+            - `'type2'` : Use a predefined learning rate schedule:
+                - Epoch 2-3: `5e-5`
+                - Epoch 4-5: `1e-5`
+                - Epoch 6-7: `5e-6`
+                - Epoch 8-9: `1e-6`
+                - Epoch 10-14: `5e-7`
+                - Epoch 15-19: `1e-7`
+                - after Epoch 20: `5e-8`
+            - `'3'` : Constant learning rate for the first 10 epochs,
+              then reduce to 10%.
+            - `'4'` : Constant learning rate for the first 15 epochs,
+              then reduce to 10%.
+            - `'5'` : Constant learning rate for the first 25 epochs,
+              then reduce to 10%.
+            - `'6'` : Constant learning rate for the first 5 epochs,
+              then reduce to 10%.
+    """
     # lr = args.learning_rate * (0.2 ** (epoch // 2))
     if args.lradj == 'type1':
         lr_adjust = {epoch: args.learning_rate * (0.5 ** ((epoch - 1) // 1))}
@@ -22,7 +55,12 @@ def adjust_learning_rate(optimizer, epoch, args):
     elif args.lradj == '5':
         lr_adjust = {epoch: args.learning_rate if epoch < 25 else args.learning_rate*0.1}
     elif args.lradj == '6':
-        lr_adjust = {epoch: args.learning_rate if epoch < 5 else args.learning_rate*0.1}  
+        lr_adjust = {epoch: args.learning_rate if epoch < 5 else args.learning_rate*0.1}
+    else:
+        raise Exception(f'lradj {args.lradj} not identified, must be one of '
+                        '[type1, type2, 3, 4, 5, 6]')
+
+    # change the learning rate of optimizer
     if epoch in lr_adjust.keys():
         lr = lr_adjust[epoch]
         for param_group in optimizer.param_groups:
@@ -81,9 +119,27 @@ class StandardScaler():
         return (data * self.std) + self.mean
 
 
-def visual(true, preds=None, name='./pic/test.pdf'):
+def visual(true: np.ndarray, preds: Optional[np.ndarray]=None,
+           name='./pic/test.pdf'):
     """
-    Results visualization
+    plot a time-series,
+    with predicted values if provided.
+    
+    Parameters
+    ----------
+    true : np.ndarray
+        The ground truth time-series data to be plotted.\n
+        Should have shape (n_samples,).
+        
+    preds : np.ndarray, optional
+        The predicted time-series data to be plotted. \n
+        Should have shape (n_samples,). \n
+        If not provided, only the ground truth will be plotted.
+        
+    name : str, optional
+        The file path where the plot will be saved. \n
+        Should include file extension (e.g., '.pdf').\n
+        Default is './pic/test.pdf'.
     """
     plt.figure()
     plt.plot(true, label='GroundTruth', linewidth=2)
@@ -92,9 +148,34 @@ def visual(true, preds=None, name='./pic/test.pdf'):
     plt.legend()
     plt.savefig(name, bbox_inches='tight')
 
-def test_params_flop(model,x_shape):
+
+def visualise_results(folder_path, i, batch_x, pred, true):
     """
-    If you want to thest former's flop, you need to give default value to inputs in model.forward(), the following code can only pass one argument to forward()
+    Visualise true time series vs prediction for the
+    first sample of the batch.
+
+    Notes
+    -----
+    Only the last channel (variable) will be plotted.
+    """
+    input = batch_x.detach().cpu().numpy()
+    # concatenate batches
+    gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
+    pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
+    visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
+
+
+def test_params_flop(model: torch.nn.Module, x_shape) -> None:
+    """
+    Compute FLOP of the model and print the computed complexities.
+
+    Notes
+    -----
+    If you want to test former's FLOP,
+    you need to give default value to inputs in model.forward(),
+    the following code can only pass one argument to forward()
+
+    Must install ptflops before use.
     """
     model_params = 0
     for parameter in model.parameters():
