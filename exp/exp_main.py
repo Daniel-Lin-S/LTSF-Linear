@@ -14,7 +14,6 @@ import os
 import time
 
 import warnings
-import matplotlib.pyplot as plt
 import numpy as np
 
 warnings.filterwarnings('ignore')
@@ -376,16 +375,18 @@ class Exp_Main(Exp_Basic):
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-        mae, mse, rmse, mape, mspe, rse, corr = metric(preds, trues)
-        print('mse:{}, mae:{}'.format(mse, mae))
+        metrics = metric(preds, trues)
+        print('mse:{}, mae:{}'.format(metrics['mse'], metrics['mae']))
+
+        # write metrics into a txt file
         f = open("result.txt", 'a')
         f.write(setting + "  \n")
-        f.write('mse:{}, mae:{}, rse:{}, corr:{}'.format(mse, mae, rse, corr))
+        f.write('mse:{}, mae:{}, rse:{}, corr:{}'.format(
+            metrics['mse'], metrics['mae'], metrics['rse'], metrics['corr']))
         f.write('\n')
         f.write('\n')
-        f.close()
 
-        np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe,rse, corr]))
+        # np.savez(folder_path + 'metrics.npz', **metrics)
         # np.save(folder_path + 'pred.npy', preds)
         # np.save(folder_path + 'true.npy', trues)
         # np.save(folder_path + 'x.npy', inputx)
