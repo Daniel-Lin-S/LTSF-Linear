@@ -82,8 +82,9 @@ class Exp_VAE2D_Pred(Exp_Main):
         if self.args.use_multi_gpu and self.args.use_gpu:
             self.pretrained_vae = nn.DataParallel(
                 self.pretrained_vae, device_ids=self.args.device_ids)
-        
+
         self.pretrained_vae.eval()
+        self.pretrained_vae.to(self.device)
     
     def _get_latent_shapes(self):
         _, data_loader = self._get_data('train')

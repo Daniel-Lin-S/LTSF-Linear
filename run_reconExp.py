@@ -18,7 +18,9 @@ np.random.seed(fix_seed)
 parser = argparse.ArgumentParser(description='First stage reconstruction')
 
 # basic config
-parser.add_argument('--is_training', type=int, required=True, help='status')
+parser.add_argument('--is_training', type=int, required=True, help='0 : test only,'
+                    '1: train prediction model only; 2 : train both reconstruction '
+                    'and prediction model')
 parser.add_argument('--model_id', type=str, required=True, help='model id')
 parser.add_argument('--model', type=str, required=True,
                     help='name of reconstruction model, options: [VAE, VQVAE]')
@@ -169,14 +171,15 @@ pred_args = deepcopy(args)
 pred_args.data = pred_args.data_pred
 pred_args.train_epochs = pred_args.train_pred_epochs
 
-if args.is_training:
+if args.is_training > 0:
     for ii in range(args.itr):
         # add experiment id
         setting = f'{base_setting}_{model_setting}_{ii}'
 
-        exp = Exp(args, config)
-        print('>>>>>>>start training Reconstructor : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
-        exp.train(setting)
+        if args.is_training > 1:
+            exp = Exp(args, config)
+            print('>>>>>>>start training Reconstructor : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
+            exp.train(setting)
 
         model_path = os.path.join(
             args.checkpoints, setting, 'checkpoint.pth')
