@@ -19,7 +19,7 @@ python -u run_reconExp.py \
   --des '' \
   --itr 1 \
   --train_epochs 10 \
-  --train_pred_epochs 1 \
+  --train_pred_epochs 5 \
   --batch_size 8  \
   --learning_rate 0.005 \
   --num_workers 0 \

@@ -18,7 +18,7 @@ import os
 from typing import List, Tuple, Optional
 
 
-# TODO - now only supports linear prediction models, should add handling of transformers later
+# TODO - now only supports linear prediction models, should add handling of transformers later (including the labeled length)
 # TODO - allow for using different prediction models on LF and HF latents
 
 
@@ -64,7 +64,7 @@ class Exp_VAE2D_Pred(Exp_Main):
     def _load_vae_model(self, model_path, vae_config) -> None:
         recon_len = gcd(self.args.seq_len, self.args.pred_len)
         self.recon_len = recon_len
-        self.pred_segments = self.args.pred_len //recon_len
+        self.pred_segments = self.args.pred_len // recon_len
         self.pretrained_vae = VAE2D(
             in_channels=self.args.enc_in,
             input_length=recon_len,
@@ -91,6 +91,7 @@ class Exp_VAE2D_Pred(Exp_Main):
         for _, (batch_x, batch_y, _, _) in enumerate(data_loader):
             batch_x = batch_x.float().to(self.device)
             batch_y = batch_y.float().to(self.device)
+            batch_y = batch_y[:, -self.args.pred_len:,:]
 
             x_segments = self._segment_sequence(batch_x, self.recon_len)
             y_segments = self._segment_sequence(batch_y, self.recon_len)
@@ -284,6 +285,7 @@ class Exp_VAE2D_Pred(Exp_Main):
 
         if calculate_loss:
             batch_y = batch_y.float().to(self.device)
+            batch_y = batch_y[:, -self.args.pred_len:,:]
             y_segments = self._segment_sequence(batch_y, self.recon_len)
             y_latents_l, y_latents_h = self._process_latents(y_segments)
             loss_l = criterion(pred_latents_l, y_latents_l)
