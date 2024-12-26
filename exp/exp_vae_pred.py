@@ -42,8 +42,8 @@ class Exp_VAE2D_Pred(Exp_Main):
             training the VAE2D modle
         """
         self.args = args
-        self._load_vae_model(model_path, vae_config)
         self.device = self._acquire_device()
+        self._load_vae_model(model_path, vae_config)
 
         shape_xl, shape_xh, shape_yl, shape_yh = self._get_latent_shapes()
 
