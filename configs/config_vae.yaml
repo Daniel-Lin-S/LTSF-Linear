@@ -1,0 +1,39 @@
+encoder:
+  init_dim: 4  # initial dimension
+  hid_dim: 128  # hidden dimension in the bottleneck
+  # number of residual blocks between down-sampling blocks
+  n_resnet_blocks: 2
+  downsampling: 'time'    # 'time' 'freq'
+  # lengths of the encoded (down-sampled) series
+  downsampled_width:
+    lf: 8
+    hf: 16
+    freq: 4  # same freq downsampling for lf and hf components
+  # number of neighbouring frequencies to be convoluted
+  frequency_bandwidth: 3
+
+# other settings of decoder are forced to be the
+# same as encoder for consistency
+decoder:
+  # number of residual blocks between up-sampling blocks
+  n_resnet_blocks: 2
+
+vae:
+  # number of Gaussian distributions used in latent space
+  latent_dim: 128
+  # whether to assign distribution to each time stamp or each time-frequency point
+  latent_type: 'spatial'  # 'spatial' 'time'
+  beta: 0.3  # the weight of beta-VAE, if set to 1, same as VAE
+
+### for STFT ###
+# number of FFT points
+n_fft: 8  # for efficient computation, use power of 2
+stft_split_type: 'real_imag'  # 'real_imag' 'magnitude_phase'
+
+codebook_sizes:
+  lf: 32
+  hf: 32
+
+# other codebook-related hyper-parameters
+VQ-VAE:
+  codebook: {}

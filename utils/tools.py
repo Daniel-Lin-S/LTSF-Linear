@@ -1,8 +1,10 @@
 import numpy as np
 import torch
+import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 from typing import Optional
 import os
+import yaml
 
 plt.switch_backend('agg')
 
@@ -69,7 +71,21 @@ def adjust_learning_rate(optimizer: torch.optim.Optimizer,
 
 
 class EarlyStopping:
-    def __init__(self, patience=7, verbose=False, delta=0):
+    def __init__(self, patience=7, verbose=False, delta=0.,
+                 model_labels=None):
+        """
+        EarlyStopping class to stop training early
+        based on validation loss.
+        
+        Parameters:
+        - patience (int): How many epochs to wait after the last improvement.
+        - verbose (bool): If True, prints the progress.
+        - delta (float): Minimum change to qualify as an improvement.
+        - model_labels (list or str or None): Optional list of labels for models.
+          If provided, model filenames will use these labels
+          instead of the default index.
+          For single model, must accept a string
+        """
         self.patience = patience
         self.verbose = verbose
         self.counter = 0
@@ -77,12 +93,13 @@ class EarlyStopping:
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.delta = delta
+        self.model_labels = model_labels
 
-    def __call__(self, val_loss, model, path):
+    def __call__(self, val_loss, models, path):
         score = -val_loss
         if self.best_score is None:
             self.best_score = score
-            self.save_checkpoint(val_loss, model, path)
+            self.save_checkpoint(val_loss, models, path)
         elif score < self.best_score + self.delta:
             self.counter += 1
             print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
@@ -90,13 +107,34 @@ class EarlyStopping:
                 self.early_stop = True
         else:
             self.best_score = score
-            self.save_checkpoint(val_loss, model, path)
+            self.save_checkpoint(val_loss, models, path)
             self.counter = 0
 
-    def save_checkpoint(self, val_loss, model, path):
+    def save_checkpoint(self, val_loss, models, path):
         if self.verbose:
-            print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-        torch.save(model.state_dict(), path + '/' + 'checkpoint.pth')
+            print(
+                f'Validation loss decreased ({self.val_loss_min:.6f}'
+                f' --> {val_loss:.6f}).  Saving model ...')
+        if not isinstance(models, list): # single model
+            model_label = self.model_labels if (
+                self.model_labels is not None) else f'checkpoint'
+            checkpoint_path = f"{path}/{model_label}.pth"
+
+            torch.save(models.state_dict(), checkpoint_path)
+        else:  # save multiple models
+            if self.model_labels is not None:
+                if len(self.model_labels) != len(models):
+                    raise ValueError(
+                        f"The length of model_labels ({len(self.model_labels)})"
+                        f" does not match the number of models ({len(models)}).")
+
+            for idx, model in enumerate(models):
+                model_label = self.model_labels[idx] if (
+                    self.model_labels is not None) else f'checkpoint_{idx}'
+                checkpoint_path = f"{path}/{model_label}.pth"
+
+                torch.save(model.state_dict(), checkpoint_path)
+
         self.val_loss_min = val_loss
 
 
@@ -183,8 +221,18 @@ def test_params_flop(model: torch.nn.Module, x_shape) -> None:
         print('INFO: Trainable parameter count: {:.2f}M'.format(model_params / 1000000.0))
     from ptflops import get_model_complexity_info    
     with torch.cuda.device(0):
-        macs, params = get_model_complexity_info(model.cuda(), x_shape, as_strings=True, print_per_layer_stat=True)
+        macs, params = get_model_complexity_info(
+            model.cuda(), x_shape, as_strings=True, print_per_layer_stat=True)
         # print('Flops:' + flops)
         # print('Params:' + params)
         print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
         print('{:<30}  {:<8}'.format('Number of parameters: ', params))
+
+
+def load_yaml_param_settings(yaml_fname: str):
+    """
+    :param yaml_fname: .yaml file that consists of hyper-parameter settings.
+    """
+    stream = open(yaml_fname, 'r')
+    config = yaml.load(stream, Loader=yaml.FullLoader)
+    return config

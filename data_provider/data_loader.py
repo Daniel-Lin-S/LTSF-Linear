@@ -285,9 +285,10 @@ class Dataset_Recon(Dataset_Custom):
     """
     def __init__(self, root_path, flag='train', size=None, features='S',
                  data_path='ETTh1.csv', target='OT', scale=True,
-                 timeenc=0, freq='h', train_only=False):
+                 timeenc=0, freq='h', train_only=False, hop_length=6):
         super().__init__(root_path, flag, size, features, data_path, target,
                          scale, timeenc, freq, train_only)
+        self.hop_length = hop_length
         
         self.gcd_len = gcd(self.seq_len, self.pred_len)
         if self.gcd_len < 24:
@@ -307,7 +308,7 @@ class Dataset_Recon(Dataset_Custom):
             the samples and their time-stamps,
             both of length gcd_len
         """
-        start_idx = index * self.gcd_len
+        start_idx = index * self.hop_length
         end_idx = start_idx + self.gcd_len
 
         seq_x = self.data[start_idx:end_idx]
@@ -319,7 +320,7 @@ class Dataset_Recon(Dataset_Custom):
         """
         number of training samples
         """
-        return len(self.data) // self.gcd_len
+        return (len(self.data) - self.gcd_len) // self.hop_length + 1
 
 
 class Dataset_Pred(Dataset):

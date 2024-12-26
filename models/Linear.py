@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
 
 class Model(nn.Module):
     """
@@ -18,7 +16,7 @@ class Model(nn.Module):
         self.individual = configs.individual
         if self.individual:
             self.Linear = nn.ModuleList()
-            for i in range(self.channels):
+            for _ in range(self.channels):
                 self.Linear.append(nn.Linear(self.seq_len,self.pred_len))
         else:
             self.Linear = nn.Linear(self.seq_len, self.pred_len)
