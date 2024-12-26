@@ -1,5 +1,5 @@
-import pytorch_lightning as pl
 import torch
+from torch import nn
 import torch.nn.functional as F
 import os
 from einops import rearrange
@@ -14,7 +14,7 @@ from utils.time_freq import (
 )
 
 
-class VAE2D(pl.LightningModule):
+class VAE2D(nn.Module):
     """
     Unsupervised learning stage using VAE with
     LF-HF separation and STFT.
@@ -223,43 +223,20 @@ class VAE2D(pl.LightningModule):
 
         return z_sample, mu, log_var
 
-    def training_step(self, batch, batch_idx):
-        recons_loss, kl_losses = self.forward(batch, batch_idx)
-        loss = recons_loss['LF.time'] + recons_loss['HF.time'] + kl_losses['combined']
-
-        # Log losses
-        self.log('train/recons_loss.time',
-                 recons_loss['LF.time'] + recons_loss['HF.time'])
-        self.log('train/recons_loss.LF.time', recons_loss['LF.time'])
-        self.log('train/recons_loss.HF.time', recons_loss['HF.time'])
-        self.log('train/kl_loss', kl_losses['combined'])
-        self.log('train/kl_loss.LF', kl_losses['LF'])
-        self.log('train/kl_loss.HF', kl_losses['HF'])
-        self.log('train/loss', loss)
-
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        self.eval()
-        recons_loss, kl_losses = self.forward(batch, batch_idx)
-        loss = recons_loss['LF.time'] + recons_loss['HF.time'] + kl_losses['combined']
-
-        # Log validation losses
-        self.log('val/recons_loss.time',
-                 recons_loss['LF.time'] + recons_loss['HF.time'])
-        self.log('val/recons_loss.HF.time', recons_loss['HF.time'])
-        self.log('val/recons_loss.LF.time', recons_loss['LF.time'])
-        self.log('val/kl_loss', kl_losses['combined'])
-        self.log('val/kl_loss.LF', kl_losses['LF'])
-        self.log('val/kl_loss.HF', kl_losses['HF'])
-        self.log('val/loss', loss)
-
-        return loss
-
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), lr=self.config['exp_params']['lr'])
         scheduler = torch.optim.lr_scheduler.ExponentialLR(opt, gamma=0.95)
         return {'optimizer': opt, 'lr_scheduler': scheduler}
+    
+    def _reshape_latent(self, z: torch.Tensor) -> torch.Tensor:
+        if self.latent_type == 'time':
+            # assign a distribution for each time stamp
+            z_reshaped = rearrange(z, 'b c h w -> b w (c h)')
+        elif self.latent_type == 'spatial':
+            # assign a distribution for each spatial point
+            z_reshaped = rearrange(z, 'b c h w -> b h w c')
+        
+        return z_reshaped
 
     def encode(self, x: torch.Tensor) -> Tuple[
         torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -294,16 +271,6 @@ class VAE2D(pl.LightningModule):
         mu_h, log_var_h = self.fc_mu_h(z_h), self.fc_logvar_h(z_h)
 
         return mu_l, log_var_l, mu_h, log_var_h
-    
-    def _reshape_latent(self, z: torch.Tensor) -> torch.Tensor:
-        if self.latent_type == 'time':
-            # assign a distribution for each time stamp
-            z_reshaped = rearrange(z, 'b c h w -> b w (c h)')
-        elif self.latent_type == 'spatial':
-            # assign a distribution for each spatial point
-            z_reshaped = rearrange(z, 'b c h w -> b h w c')
-        
-        return z_reshaped
 
     def decode(self, z_l: torch.Tensor, z_h: torch.Tensor) -> torch.Tensor:
         """

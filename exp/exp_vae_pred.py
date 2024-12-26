@@ -296,7 +296,6 @@ class Exp_VAE2D_Pred(Exp_Main):
         """
         Load the dataset and preprocess it for latent prediction.
         """
-        print(f'flag {flag}, prediction length: {self.args.pred_len}')
         dataset, data_loader = data_provider(self.args, flag)
         return dataset, data_loader
 
