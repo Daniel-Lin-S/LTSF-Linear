@@ -6,29 +6,36 @@ from torch.utils.data import Dataset
 from sklearn.preprocessing import StandardScaler
 from utils.timefeatures import time_features
 import warnings
+from abc import abstractmethod, ABC
 
 warnings.filterwarnings('ignore')
 
 
-class Base_Dataset(Dataset):
+class Base_Dataset(Dataset, ABC):
     """
     Base dataset class for prediction model training. \n
     Subclasses must define __read_data__.
+
+    Notes
+    -----
+    - when mode is 'pred', the created y values
+      will be taken from a window of length label_len + pred_len.
+      Where label_len is overlapping with the window giving x-values.
+      This is for transformer-based models to use next token prediction.
     """
-    def __init__(self, root_path, flag, size,
+    def __init__(self, root_path: str, flag: str, size,
                  features: str, data_path: str,
                  target: str, scale: bool,
-                 timeenc: int, freq: str, train_only: bool):
+                 timeenc: int, freq: str, train_only: bool,
+                 hop_length: int, mode: str):
         """
-        Initializes the Dataset_Recon.
-
         Parameters
         ----------
         root_path : str
             The root directory where the dataset is stored.
         flag : str, optional, default 'train'
             The type of dataset to load, can be 'train', 'val', or 'test'.
-        size : list of int, optional, default None
+        size : list of int or None
             Specifies [seq_len, _, pred_len], where:
             - `seq_len` is the length of input sequences.
             - `label_len`: length of overlap for transformer
@@ -51,6 +58,14 @@ class Base_Dataset(Dataset):
         train_only : bool
             Whether the whole dataset should be treated as.
             training set
+        hop_length : int
+            interval between adjacent sliding windows to
+            extract the dataset.
+        mode : str, optional
+            if mode is 'pred', items will be x-y pairs taken from
+            adjacent sliding windows. If mode is 'recon',
+            items are only x segments cut from the gcd of
+            seq_len and pred_len. (unsupverised learning)
         """
 
         # initialise three lengths
@@ -63,6 +78,16 @@ class Base_Dataset(Dataset):
             self.label_len = size[1]
             self.pred_len = size[2]
 
+        assert mode in ['pred', 'recon']
+        self.mode = mode
+        if mode == 'recon':
+            self.gcd_len = gcd(self.seq_len, self.pred_len)
+            if self.gcd_len < 24:
+                warnings.warn('length of greatest common divisor of seq_len and pred_len,'
+                            f' {self.gcd_len}, is very short '
+                            'consider changing seq_len and pred_len '
+                            'for reconstructors to use more information', UserWarning)
+
         assert flag in ['train', 'test', 'val']
         type_map = {'train': 0, 'val': 1, 'test': 2}
         self.set_type = type_map[flag]
@@ -73,35 +98,55 @@ class Base_Dataset(Dataset):
         self.timeenc = timeenc
         self.freq = freq
         self.train_only = train_only
+        self.hop_length = hop_length
+        self.scaler = StandardScaler()
 
         self.root_path = root_path
         self.data_path = data_path
         self.__read_data__()
+        self._validate_data()
     
+    @abstractmethod
     def __read_data__(self):
         """
         Must assign self.data, self.data_stamp
-        (time stamps of self.data) and self.scaler
+        (time stamps of self.data)
         to be used by __getitem__
         """
         raise NotImplementedError
 
-    def __getitem__(self, index):
-        s_begin = index
-        s_end = s_begin + self.seq_len
-        r_begin = s_end - self.label_len
-        r_end = r_begin + self.label_len + self.pred_len
+    def __getitem__(self, index: int):
+        """
+        Sliding window with hop length 1
+        """
+        if self.mode == 'pred':
+            s_begin = index * self.hop_length
+            s_end = s_begin + self.seq_len
+            r_begin = s_end - self.label_len
+            r_end = r_begin + self.label_len + self.pred_len
 
-        seq_x = self.data[s_begin:s_end]
-        seq_y = self.data[r_begin:r_end]
-        seq_x_mark = self.data_stamp[s_begin:s_end]
-        seq_y_mark = self.data_stamp[r_begin:r_end]
+            seq_x = self.data[s_begin:s_end]
+            seq_y = self.data[r_begin:r_end]
+            seq_x_mark = self.data_stamp[s_begin:s_end]
+            seq_y_mark = self.data_stamp[r_begin:r_end]
 
-        return seq_x, seq_y, seq_x_mark, seq_y_mark
+            return seq_x, seq_y, seq_x_mark, seq_y_mark
+        elif self.mode == 'recon':
+            start_idx = index * self.hop_length
+            end_idx = start_idx + self.gcd_len
+
+            seq_x = self.data[start_idx:end_idx]
+            seq_x_mark = self.data_stamp[start_idx:end_idx]
+
+            return seq_x, seq_x_mark
  
     def __len__(self):
-        return len(self.data) - self.seq_len - self.pred_len + 1
-    
+        if self.mode == 'pred':
+            return (len(self.data) - self.seq_len - self.pred_len
+                    ) // self.hop_length + 1
+        elif self.mode == 'recon':
+            return (len(self.data) - self.gcd_len) // self.hop_length + 1
+
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
 
@@ -135,16 +180,25 @@ class Base_Dataset(Dataset):
             data = df_data.values
         return data
 
+    def _validate_data(self):
+        assert hasattr(self, 'data'), (
+            "data is not assigned by read data method!"
+        )
+        assert hasattr(self, 'data_stamp'), (
+            "data_stamp is not assigned by read data method!"
+        )
+
 
 class Dataset_ETT_hour(Base_Dataset):
     def __init__(self, root_path, flag='train', size=None,
                  features='S', data_path='ETTh1.csv',
-                 target='OT', scale=True, timeenc=0, freq='h', train_only=False):
+                 target='OT', scale=True, timeenc=0, freq='h', train_only=False,
+                 hop_length=1, mode='pred'):
         super().__init__(root_path, flag, size, features,
-                         data_path, target, scale, timeenc, freq, train_only)
+                         data_path, target, scale, timeenc, freq, train_only,
+                         hop_length, mode)
 
     def __read_data__(self):
-        self.scaler = StandardScaler()
         df_raw = pd.read_csv(os.path.join(self.root_path,
                                           self.data_path))
 
@@ -175,12 +229,13 @@ class Dataset_ETT_hour(Base_Dataset):
 class Dataset_ETT_minute(Base_Dataset):
     def __init__(self, root_path, flag='train', size=None,
                  features='S', data_path='ETTm1.csv',
-                 target='OT', scale=True, timeenc=0, freq='t', train_only=False):
+                 target='OT', scale=True, timeenc=0, freq='t', train_only=False,
+                 hop_length=1, mode='pred'):
         super().__init__(root_path, flag, size, features,
-                         data_path, target, scale, timeenc, freq, train_only)
+                         data_path, target, scale, timeenc, freq, train_only,
+                         hop_length, mode)
 
     def __read_data__(self):
-        self.scaler = StandardScaler()
         df_raw = pd.read_csv(os.path.join(self.root_path,
                                           self.data_path))
 
@@ -221,17 +276,17 @@ class Dataset_Custom(Base_Dataset):
     """
     def __init__(self, root_path, flag='train', size=None,
                  features='S', data_path='ETTh1.csv',
-                 target='OT', scale=True, timeenc=0, freq='h',
-                 train_only=False):
+                 target='OT', scale=True, timeenc=0, freq='h', train_only=False,
+                 hop_length=1, mode='pred'):
         super().__init__(root_path, flag, size, features,
-                         data_path, target, scale, timeenc, freq, train_only)
+                         data_path, target, scale, timeenc, freq, train_only,
+                         hop_length, mode)
 
     def __read_data__(self):
         """
         Reads and processes the raw data, applies scaling,
         and handles time-based features.
         """
-        self.scaler = StandardScaler()
         df_raw = pd.read_csv(os.path.join(self.root_path,
                                           self.data_path))
 
@@ -251,7 +306,6 @@ class Dataset_Custom(Base_Dataset):
             df_raw = df_raw[['date'] + cols + [self.target]]
             df_data = df_raw[[self.target]]
 
-        # Apply scaling if specified
         data = self._scale(border1s, border2s, df_data)
 
         df_stamp = df_raw[['date']][border1:border2]
@@ -275,55 +329,11 @@ class Dataset_Custom(Base_Dataset):
         return border1s, border2s, border1, border2
 
 
-class Dataset_Recon(Dataset_Custom):
-    """
-    Dataset for time-series reconstruction tasks. \n
-    This dataset loads subsequences of 
-    length equal to the greatest common divisor (GCD)
-    of the sequence length (seq_len) 
-    and prediction length (pred_len).
-    """
-    def __init__(self, root_path, flag='train', size=None, features='S',
-                 data_path='ETTh1.csv', target='OT', scale=True,
-                 timeenc=0, freq='h', train_only=False, hop_length=6):
-        super().__init__(root_path, flag, size, features, data_path, target,
-                         scale, timeenc, freq, train_only)
-        self.hop_length = hop_length
-        
-        self.gcd_len = gcd(self.seq_len, self.pred_len)
-        if self.gcd_len < 24:
-            warnings.warn('length of greatest common divisor of seq_len and pred_len, '
-                          f'{self.gcd_len}, is very short '
-                          'consider changing seq_len and pred_len '
-                          'for reconstructors to use more information', UserWarning)
- 
-    def __getitem__(self, index: int):
-        """
-        Get blocks of sub-series according to greatest common divisor
-        of seq_len and pred_len
-
-        Return
-        ------
-        seq_x, seq_x_mark
-            the samples and their time-stamps,
-            both of length gcd_len
-        """
-        start_idx = index * self.hop_length
-        end_idx = start_idx + self.gcd_len
-
-        seq_x = self.data[start_idx:end_idx]
-        seq_x_mark = self.data_stamp[start_idx:end_idx]
-
-        return seq_x, seq_x_mark
-
-    def __len__(self) -> int:
-        """
-        number of training samples
-        """
-        return (len(self.data) - self.gcd_len) // self.hop_length + 1
-
-
 class Dataset_Pred(Dataset):
+    """
+    Data loadiing with no train-validation-test
+    split.
+    """
     def __init__(self, root_path, flag='pred', size=None,
                  features='S', data_path='ETTh1.csv',
                  target='OT', scale=True, inverse=False,

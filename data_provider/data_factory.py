@@ -1,6 +1,6 @@
 from data_provider.data_loader import (
     Dataset_ETT_hour, Dataset_ETT_minute,
-    Dataset_Custom, Dataset_Pred, Dataset_Recon
+    Dataset_Custom, Dataset_Pred
 )
 from torch.utils.data import DataLoader
 
@@ -9,12 +9,11 @@ data_dict = {
     'ETTh2': Dataset_ETT_hour,
     'ETTm1': Dataset_ETT_minute,
     'ETTm2': Dataset_ETT_minute,
-    'custom': Dataset_Custom,
-    'recon': Dataset_Recon
+    'custom': Dataset_Custom
 }
 
 
-def data_provider(args, flag):
+def data_provider(args, flag:str, mode:str):
     """
     Create the dataset and data loader
 
@@ -46,10 +45,16 @@ def data_provider(args, flag):
           predicted when feature is S or MS.
         - num_workers (int): number of parallel workers
           for data loading
+        - hop_length (int): distance between adjacent
+          sliding windows
 
-    flag: str
+    flag : str
         the strategy of getting data.
         Must be one of 'test', 'val', 'train', 'pred'
+
+    mode : str
+        One of 'pred' and 'recon'.
+        Supervised and un-supervised learning tasks
     
     Return
     ------
@@ -89,7 +94,9 @@ def data_provider(args, flag):
         target=args.target,
         timeenc=timeenc,
         freq=freq,
-        train_only=train_only
+        train_only=train_only,
+        hop_length=args.hop_length,
+        mode=mode
     )
 
     n_iters = len(data_set) // batch_size

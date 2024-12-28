@@ -29,7 +29,7 @@ class Exp_Main(Exp_Basic):
         return model
 
     def _get_data(self, flag):
-        data_set, data_loader = data_provider(self.args, flag)
+        data_set, data_loader = data_provider(self.args, flag, 'pred')
         return data_set, data_loader
 
     def test(self, setting, test=0):
