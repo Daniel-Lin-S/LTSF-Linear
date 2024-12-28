@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from typing import Optional
 import os
 import yaml
+import argparse
+from copy import deepcopy
 
 plt.switch_backend('agg')
 
@@ -235,3 +237,47 @@ def load_yaml_param_settings(yaml_fname: str):
     stream = open(yaml_fname, 'r')
     config = yaml.load(stream, Loader=yaml.FullLoader)
     return config
+
+
+def split_args_two_stages(args: argparse.Namespace):
+    """
+    Splits the namespace into two separate namespaces for
+    reconstruction and prediction stages.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Input arguments.
+
+    Returns
+    -------
+    recon_args : argparse.Namespace
+        Arguments for reconstruction.
+    pred_args : argparse.Namespace
+        Arguments for prediction.
+    """
+    # Convert to dictionary
+    args_dict = vars(args)
+
+    recon_args = deepcopy(args_dict)
+    pred_args = deepcopy(args_dict)
+
+    # Update stage-specific arguments
+    recon_args["model"] = args.model_recon
+    pred_args["model"] = args.model_pred
+    recon_args["batch_size"] = args.batch_size_recon
+    pred_args["batch_size"] = args.batch_size_pred
+    recon_args["train_epochs"] = args.train_epochs_recon
+    pred_args["train_epochs"] = args.train_epochs_pred
+    recon_args["hop_length"] = args.hop_length_recon
+    pred_args["hop_length"] = args.hop_length_pred
+    recon_args["patience"] = args.patience_recon
+    pred_args["patience"] = args.patience_pred
+    recon_args["learning_rate"] = args.learning_rate_recon
+    pred_args["learning_rate"] = args.learning_rate_pred
+
+    # Convert back to namespaces
+    recon_args = argparse.Namespace(**recon_args)
+    pred_args = argparse.Namespace(**pred_args)
+
+    return recon_args, pred_args
