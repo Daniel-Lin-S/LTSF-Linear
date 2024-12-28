@@ -1,8 +1,10 @@
 from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
 from models import Informer, Autoformer, Transformer, DLinear, Linear, NLinear
-from utils.tools import EarlyStopping, adjust_learning_rate, visualise_results, test_params_flop
-from utils.metrics import metric
+from utils.tools import (
+    EarlyStopping, adjust_learning_rate, visualise_results, test_params_flop
+)
+from utils.metrics import metric, decay_l2_loss
 
 import numpy as np
 import pandas as pd
@@ -100,14 +102,14 @@ class Exp_Main(Exp_Basic):
         return model
 
     def _get_data(self, flag):
-        data_set, data_loader = data_provider(self.args, flag)
+        data_set, data_loader = data_provider(self.args, flag, 'pred')
         return data_set, data_loader
 
     def _select_optimizer(self):
         model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
         return model_optim
 
-    def _select_criterion(self) -> callable:
+    def _get_loss(self) -> callable:
         """
         define criterion used to evaluate the prediction
 
@@ -118,8 +120,19 @@ class Exp_Main(Exp_Basic):
             of shape (batch_size, pred_len, channels)
             and return a score
         """
-        criterion = nn.MSELoss()
-        return criterion
+        available_losses = ['mse', 'l1', 'decay_mse']
+        if self.args.loss == 'mse':
+            return nn.MSELoss()
+        elif self.args.loss == 'l1':
+            return nn.L1Loss()
+        elif self.args.loss == 'decay_mse':
+            return decay_l2_loss
+        else:
+            raise NotImplementedError(
+                f'Given loss type {self.args.loss}'
+                'is not supported. Available options: '
+                f"{', '.join(available_losses)}."
+            )
 
     def _extract_prediction(self, batch_y, outputs):
         """
@@ -236,7 +249,7 @@ class Exp_Main(Exp_Basic):
         early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
 
         model_optim = self._select_optimizer()
-        criterion = self._select_criterion()
+        criterion = self._get_loss()
 
         if self.args.use_amp:
             scaler = torch.cuda.amp.GradScaler()
@@ -372,6 +385,32 @@ class Exp_Main(Exp_Basic):
             test_params_flop((batch_x.shape[1],batch_x.shape[2]))
             exit()
 
+        self._save_results(setting, preds, trues, inputx)
+
+        return
+
+    def _save_results(self, setting, preds, trues, inputx,
+                      save_all=False) -> None:
+        """
+        Calculate the metrics and save them to results.txt
+        file, and print MSE, MAE.
+
+        Parameters
+        ----------
+        setting : str
+            the identifier of this experiment
+        preds, trues : torch.Tensor
+            the predicted values and ground truth
+        inputx : torch.Tensor
+            the input series used to produce the
+            predicted values
+        save_all : bool, optional
+            if True, save the preds, trues, inputx
+            and all metrics as numpy value files.
+            Warning: this can consume a lot of disk space
+            if the dataset is large.
+            Default is False.
+        """
         preds = np.concatenate(preds, axis=0)
         trues = np.concatenate(trues, axis=0)
         inputx = np.concatenate(inputx, axis=0)
@@ -392,11 +431,11 @@ class Exp_Main(Exp_Basic):
         f.write('\n')
         f.write('\n')
 
-        # np.savez(folder_path + 'metrics.npz', **metrics)
-        # np.save(folder_path + 'pred.npy', preds)
-        # np.save(folder_path + 'true.npy', trues)
-        # np.save(folder_path + 'x.npy', inputx)
-        return
+        if save_all:
+            np.savez(folder_path + 'metrics.npz', **metrics)
+            np.save(folder_path + 'pred.npy', preds)
+            np.save(folder_path + 'true.npy', trues)
+            np.save(folder_path + 'x.npy', inputx)
 
     def predict(self, setting, load=False):
         pred_data, pred_loader = self._get_data(flag='pred')

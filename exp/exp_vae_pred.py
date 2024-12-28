@@ -1,9 +1,7 @@
 from einops import rearrange
 from data_provider.data_factory import data_provider
 from exp.exp_main import Exp_Main
-from models import Informer, Autoformer, Transformer, DLinear, Linear, NLinear
 from models.VAE2D import VAE2D
-from utils.metrics import metric
 from utils.tools import visualise_results, EarlyStopping, adjust_learning_rate
 
 import numpy as np
@@ -104,36 +102,6 @@ class Exp_VAE2D_Pred(Exp_Main):
         return (
             x_latents_l.shape, x_latents_h.shape,
             y_latents_l.shape, y_latents_h.shape)
-
-    def _build_model(self, model_args):
-        """
-        Build the prediction model dynamically based on args.
-        """
-        model_dict = {
-            'Autoformer': Autoformer,
-            'Transformer': Transformer,
-            'Informer': Informer,
-            'DLinear': DLinear,
-            'NLinear': NLinear,
-            'Linear': Linear,
-        }
-        if model_args.pred_model not in model_dict:
-            raise ValueError(
-                f"Invalid model name '{model_args.pred_model}'. "
-                "Available models are: "
-                + ", ".join(model_dict.keys())
-            )
-        model = model_dict[model_args.pred_model].Model(model_args).float()
-        
-        if self.args.use_multi_gpu and self.args.use_gpu:
-            model = nn.DataParallel(model, device_ids=self.args.device_ids)
-        
-        total_params = sum(p.numel() 
-                           for p in model.parameters() 
-                           if p.requires_grad)
-        print('Number of trainable parameters of the '
-              f'prediction model {model_args.pred_model}: {total_params}')
-        return model
 
     def _segment_sequence(self, x: torch.Tensor,
                           seq_len: int) -> List[torch.Tensor]:
@@ -291,24 +259,24 @@ class Exp_VAE2D_Pred(Exp_Main):
             y_latents_l, y_latents_h = self._process_latents(y_segments)
             loss_l = criterion(pred_latents_l, y_latents_l)
             loss_h = criterion(pred_latents_h, y_latents_h)
-            return loss_l,loss_h
+            return loss_l, loss_h
         else:
             return pred_latents_l, pred_latents_h
 
-    def _get_data(self, flag):
+    def _get_data(self, flag: str):
         """
         Load the dataset and preprocess it for latent prediction.
         """
-        dataset, data_loader = data_provider(self.args, flag)
+        dataset, data_loader = data_provider(self.args, flag, 'pred')
         return dataset, data_loader
 
-    def train(self, setting):
+    def train(self, setting: str) -> None:
         _, train_loader = self._get_data(flag='train')
         _, vali_loader = self._get_data(flag='val') if not self.args.train_only else None
 
         model_optim_l = optim.Adam(self.model_l.parameters(), lr=self.args.learning_rate)
         model_optim_h = optim.Adam(self.model_h.parameters(), lr=self.args.learning_rate)
-        criterion = nn.MSELoss()
+        criterion = self._get_loss()
         model_labels = ['pred_lf', 'pred_hf']
         early_stopping = EarlyStopping(patience=self.args.patience,
                                        verbose=True, model_labels=model_labels)
@@ -377,7 +345,7 @@ class Exp_VAE2D_Pred(Exp_Main):
             adjust_learning_rate(model_optim_l, epoch + 1, self.args)
             adjust_learning_rate(model_optim_h, epoch + 1, self.args)
 
-    def vali(self, vali_loader, criterion):
+    def vali(self, vali_loader, criterion: callable) -> Tuple[float, float]:
         self.model_l.eval()
         self.model_h.eval()
 
@@ -394,7 +362,7 @@ class Exp_VAE2D_Pred(Exp_Main):
 
         return np.mean(vali_loss_l), np.mean(vali_loss_h)
 
-    def test(self, setting, test=0):
+    def test(self, setting, test: int=0) -> None:
         """
         Evaluate the model on the test set, report metrics, and save results.
 
@@ -402,8 +370,9 @@ class Exp_VAE2D_Pred(Exp_Main):
         ----------
         setting : str
             Identifier for the experiment (e.g., model configuration).
-        test : bool, optional
-            If True, load the best checkpoint for evaluation. Default is False.
+        test : int, optional
+            If not 0, load the best checkpoint for evaluation.
+            Default is 0.
         """
         _, test_loader = self._get_data(flag='test')
         
@@ -447,23 +416,6 @@ class Exp_VAE2D_Pred(Exp_Main):
                 if i % 20 == 0:  # Visualise predictions every 20 batches
                     visualise_results(folder_path, i, batch_x, pred, true)
 
-        preds = np.concatenate(preds, axis=0)
-        trues = np.concatenate(trues, axis=0)
-        inputx = np.concatenate(inputx, axis=0)
+        self._save_results(setting, preds, trues, inputx)
 
-        ### Save results ###
-        folder_path = './results/' + setting + '/'
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
-        metrics = metric(preds, trues)
-        print('mse:{}, mae:{}'.format(metrics['mse'], metrics['mae']))
-
-        # Write metrics into a text file
-        with open("result.txt", 'a') as f:
-            f.write(setting + "  \n")
-            f.write('mse:{}, mae:{}, rse:{}, corr:{}'.format(
-                metrics['mse'], metrics['mae'], metrics['rse'], metrics['corr']))
-            f.write('\n\n')
-
-        return metrics
+        return

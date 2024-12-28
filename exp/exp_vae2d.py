@@ -40,6 +40,8 @@ class Exp_VAE2D(Exp_Basic):
             Configuration file for initializing VAE2D model.
         """
         self.config = config
+        self.init_beta = config['vae']['beta_init']
+        self.final_beta = config['vae']['beta']
         super(Exp_VAE2D, self).__init__(args)
 
     def _build_model(self):
@@ -84,12 +86,7 @@ class Exp_VAE2D(Exp_Basic):
         -------
         dataset, DataLoader
         """
-        if not self.args.data.startswith('recon'):
-            raise ValueError(
-                "data must points to a reconstruction dataset "
-                "starting with 'recon'."
-            )
-        dataset, dataloader = data_provider(self.args, flag)
+        dataset, dataloader = data_provider(self.args, flag, 'recon')
         return dataset, dataloader
 
     def _select_optimizer(self):
@@ -98,9 +95,26 @@ class Exp_VAE2D(Exp_Basic):
 
         Returns
         -------
-        torch.optim.Optimizer
+        torch.optim.Optimizer, torch.optim.lr_scheduler
+            The optimizer and learning rate scheduler
         """
-        return optim.AdamW(self.model.parameters(), lr=self.args.learning_rate)
+        optimizer = optim.AdamW(
+            self.model.parameters(), lr=self.args.learning_rate)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+        return optimizer, scheduler
+
+    def adjusted_beta(self, epoch: int, total_epochs: int) -> float:
+        """
+        Gradual annealing schedule for the KL loss.
+        Starts with a lower beta value and increases it gradually.
+
+        Return
+        ------
+        float
+            the beta-value for current epoch
+        """
+        return self.init_beta + (
+            self.final_beta - self.init_beta) * (epoch / total_epochs)
 
     def train(self, setting):
         """
@@ -126,7 +140,7 @@ class Exp_VAE2D(Exp_Basic):
         train_steps = len(train_loader)
         early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
 
-        model_optim = self._select_optimizer()
+        model_optim, scheduler = self._select_optimizer()
 
         for epoch in range(self.args.train_epochs):
             iter_count = 0
@@ -134,12 +148,14 @@ class Exp_VAE2D(Exp_Basic):
             self.model.train()
             epoch_time = time.time()
 
+            beta = self.adjusted_beta(epoch, self.args.train_epochs)
+
             for i, batch in enumerate(train_loader):
                 batch_x, _ = batch  # Assuming batch contains only data and no labels
                 batch_x = batch_x.float().to(self.device)
 
                 model_optim.zero_grad()
-                recons_loss, kl_losses = self.model(batch_x, i)
+                recons_loss, kl_losses = self.model(batch_x, i, beta=beta)
                 loss = recons_loss['LF.time'] + recons_loss['HF.time'] + kl_losses['combined']
 
                 train_loss.append(loss.item())
@@ -157,8 +173,8 @@ class Exp_VAE2D(Exp_Basic):
             print(f"Epoch: {epoch+1} cost time: {(time.time() - epoch_time):.2f}s")
             train_loss = np.average(train_loss)
 
-            vali_loss = self.validate(vali_data, vali_loader, setting)
-            test_loss = self.validate(test_data, test_loader, setting)
+            vali_loss = self.validate(vali_data, vali_loader, setting, epoch)
+            test_loss = self.validate(test_data, test_loader, setting, epoch)
 
             print(
                 f"Epoch: {epoch+1}, Train Loss: {train_loss:.4f}"
@@ -169,16 +185,20 @@ class Exp_VAE2D(Exp_Basic):
                 print("Early stopping")
                 break
 
-            adjust_learning_rate(model_optim, epoch + 1, self.args)
+            scheduler.step()
+            # adjust_learning_rate(model_optim, epoch + 1, self.args)
+            for param_group in model_optim.param_groups:
+                print(f"Epoch {epoch+1} Learning Rate: {param_group['lr']}")
 
         # restore the model with lowest validation loss
+        print('Training finished, saving the best model...')
         best_model_path = os.path.join(path, 'checkpoint.pth')
         self.model.load_state_dict(torch.load(best_model_path))
         test_loss = self.validate(
-                test_data, test_loader, setting, plot_recon=True)
+                test_data, test_loader, setting, epoch, plot_recon=True)
         return self.model
 
-    def validate(self, vali_data, vali_loader, setting,
+    def validate(self, vali_data, vali_loader, setting, epoch_id,
                  plot_recon: bool=False):
         """
         Validate the model.
@@ -189,6 +209,8 @@ class Exp_VAE2D(Exp_Basic):
         vali_loader : DataLoader
         setting : str
             A unique identifier for the training run.
+        epoch_id : int
+            index of current epoch
         plot_recon : bool, optional
             if True, the reconstructions will be saved into
             pdf files in the
@@ -200,12 +222,16 @@ class Exp_VAE2D(Exp_Basic):
         """
         self.model.eval()
         total_loss = []
+        beta = self.adjusted_beta(epoch_id, self.args.train_epochs)
 
         folder_path = './test_results/' + setting
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
         with torch.no_grad():
+            recon_losses_lf = []
+            recon_losses_hf = []
+            recon_losses_kl = []
             for i, batch in enumerate(vali_loader):
                 batch_x, _ = batch
                 batch_x = batch_x.float().to(self.device)
@@ -217,9 +243,18 @@ class Exp_VAE2D(Exp_Basic):
 
                 recons_loss, kl_losses = self.model(
                     batch_x, i, save_recon=save_recon,
-                    folder_path=folder_path)
+                    folder_path=folder_path, beta=beta)
+                recon_losses_lf.append(recons_loss['LF.time'].item())
+                recon_losses_hf.append(recons_loss['HF.time'].item())
+                recon_losses_kl.append(kl_losses['combined'].item())
+
                 loss = recons_loss['LF.time'] + recons_loss['HF.time'] + kl_losses['combined']
                 total_loss.append(loss.item())
+
+            print("Loss breakdown: "
+                  f"Reconstruction losses: LF {np.average(recon_losses_lf)}"
+                  f", HF {np.average(recon_losses_hf)}, "
+                  f"KL loss: {np.average(recon_losses_kl)}")
 
         total_loss = np.average(total_loss)
         self.model.train()
