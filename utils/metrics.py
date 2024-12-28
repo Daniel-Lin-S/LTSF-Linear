@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 
 def RSE(pred, true):
@@ -82,3 +83,32 @@ def metric(pred: np.ndarray, true: np.ndarray) -> dict:
     }
 
     return metrics
+
+def decay_l2_loss(prediction: torch.Tensor,
+                  target: torch.Tensor) -> torch.Tensor:
+    """
+    Custom L2 loss with signal decay 
+    (weight scales as 1/t where t is the time step).
+
+    Parameters
+    ----------
+    prediction, target : torch.Tensor
+        Predicted values and Ground truth values
+        of shape (batch_size, length, channels)
+
+    Returns
+    -------
+    torch.Tensor
+        The weighted L2 loss value.
+    """
+    mse_loss = torch.nn.MSELoss(reduction='none')
+
+    time_steps = torch.arange(1, prediction.size(1) + 1
+                              ).to(prediction.device)
+
+    # Apply time decay: weight by 1/t
+    decay_weights = 1 / (time_steps.float())
+
+    weighted_loss = mse_loss * decay_weights.unsqueeze(0) # Shape: [batch_size, length]
+
+    return weighted_loss.mean()  # scalar
