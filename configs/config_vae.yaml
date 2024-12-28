@@ -6,8 +6,8 @@ encoder:
   downsampling: 'time'    # 'time' 'freq'
   # lengths of the encoded (down-sampled) series
   downsampled_width:
-    lf: 8
-    hf: 16
+    lf: 16
+    hf: 32
     freq: 4  # same freq downsampling for lf and hf components
   # number of neighbouring frequencies to be convoluted
   frequency_bandwidth: 3
@@ -23,7 +23,8 @@ vae:
   latent_dim: 128
   # whether to assign distribution to each time stamp or each time-frequency point
   latent_type: 'spatial'  # 'spatial' 'time'
-  beta: 0.3  # the weight of beta-VAE, if set to 1, same as VAE
+  beta: 0.  # the weight of beta-VAE, if set to 1, same as VAE
+  beta_init: 0.
 
 ### for STFT ###
 # number of FFT points

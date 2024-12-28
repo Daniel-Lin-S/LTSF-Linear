@@ -106,14 +106,22 @@ class VAE2D(nn.Module):
         have any shape, but must be consistent.
         """
         std = torch.exp(0.5 * log_var)
+
+        if torch.isinf(std).any():
+            raise ValueError(
+                "Standard deviation contains Inf values (overflow), "
+                " VAE forwarding stopped")
         eps = torch.randn_like(std)
         return mu + eps * std
 
     def forward(self, batch_x: torch.Tensor, batch_idx: int,
+                beta: Optional[float]=None,
                 return_x_rec: bool = False,
                 save_recon: bool=False,
                 folder_path: Optional[str]=None):
         """
+        :param beta: a value between 0 and 1, the
+          weight on regularisation power of KL loss
         :param return_x_rec: if True, directly return the
           reconstructed series x_rec.
         :param save_recon: if True, the reconstructions
@@ -123,6 +131,14 @@ class VAE2D(nn.Module):
           the reconstruction figures will be plotted.
           Only used if save_recon=True
         """
+        if beta is None: # use default value
+            beta = self.config['vae']['beta']
+        
+        if torch.isnan(batch_x).any():
+            raise ValueError(
+                'Input cannot have nan values'
+            )
+
         # input shape (batch_size, length, channels)
         x = rearrange(batch_x, 'b l c -> b c l')
 
@@ -157,7 +173,7 @@ class VAE2D(nn.Module):
         kl_loss_h = -0.5 * torch.sum(
             1 + log_var_h - mu_h.pow(2) - log_var_h.exp())
 
-        kl_loss = self.config['vae']['beta'] * (kl_loss_l + kl_loss_h)
+        kl_loss = beta * (kl_loss_l + kl_loss_h)
         kl_losses = {
             'combined': kl_loss,
             'LF': kl_loss_l,
@@ -222,11 +238,6 @@ class VAE2D(nn.Module):
             z_sample = rearrange(z_sample, 'b h w c -> b c h w')
 
         return z_sample, mu, log_var
-
-    def configure_optimizers(self):
-        opt = torch.optim.AdamW(self.parameters(), lr=self.config['exp_params']['lr'])
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(opt, gamma=0.95)
-        return {'optimizer': opt, 'lr_scheduler': scheduler}
     
     def _reshape_latent(self, z: torch.Tensor) -> torch.Tensor:
         if self.latent_type == 'time':
