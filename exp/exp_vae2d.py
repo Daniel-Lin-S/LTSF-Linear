@@ -5,9 +5,11 @@ import numpy as np
 import os
 import time
 from math import gcd
+from typing import List, Optional
+import matplotlib.pyplot as plt
 
 from data_provider.data_factory import data_provider
-from utils.tools import EarlyStopping, adjust_learning_rate
+from utils.tools import EarlyStopping, adjust_learning_rate, plot_reconstruction_for_channels
 from models.VAE2D import VAE2D
 from exp.exp_basic import Exp_Basic
 
@@ -54,6 +56,7 @@ class Exp_VAE2D(Exp_Basic):
             Initialised VAE2D model.
         """
         recon_len = gcd(self.args.seq_len, self.args.pred_len)
+        self.recon_len = recon_len
         print(f'Reconstruction length: {recon_len}')
         model = VAE2D(
             in_channels=self.args.enc_in,
@@ -173,8 +176,10 @@ class Exp_VAE2D(Exp_Basic):
             print(f"Epoch: {epoch+1} cost time: {(time.time() - epoch_time):.2f}s")
             train_loss = np.average(train_loss)
 
-            vali_loss = self.validate(vali_data, vali_loader, setting, epoch)
-            test_loss = self.validate(test_data, test_loader, setting, epoch)
+            vali_loss = self.validate(
+                vali_data, vali_loader, setting, epoch, flag='Vali')
+            test_loss = self.validate(
+                test_data, test_loader, setting, epoch, flag='Test')
 
             print(
                 f"Epoch: {epoch+1}, Train Loss: {train_loss:.4f}"
@@ -195,11 +200,21 @@ class Exp_VAE2D(Exp_Basic):
         best_model_path = os.path.join(path, 'checkpoint.pth')
         self.model.load_state_dict(torch.load(best_model_path))
         test_loss = self.validate(
-                test_data, test_loader, setting, epoch, plot_recon=True)
+                test_data, test_loader, setting, epoch, plot_recon=True,
+                flag='Final test')
+        print(f'Final test loss: {test_loss}')
+        
+        folder_path = './test_results/' + setting
+        full_data = np.concatenate((train_data.data, vali_data.data, test_data.data),
+                                   axis=0)  # join temporal axis
+        lengths = [train_data.data.shape[0], vali_data.data.shape[0],
+                   test_data.data.shape[0]]
+        self.plot_reconstruction(full_data, folder_path, lengths)
+
         return self.model
 
     def validate(self, vali_data, vali_loader, setting, epoch_id,
-                 plot_recon: bool=False):
+                 plot_recon: bool=False, flag='Vali'):
         """
         Validate the model.
 
@@ -251,11 +266,71 @@ class Exp_VAE2D(Exp_Basic):
                 loss = recons_loss['LF.time'] + recons_loss['HF.time'] + kl_losses['combined']
                 total_loss.append(loss.item())
 
-            print("Loss breakdown: "
+            print(f"{flag} loss breakdown -- "
                   f"Reconstruction losses: LF {np.average(recon_losses_lf)}"
-                  f", HF {np.average(recon_losses_hf)}, "
+                  f", HF {np.average(recon_losses_hf)}; "
                   f"KL loss: {np.average(recon_losses_kl)}")
 
         total_loss = np.average(total_loss)
         self.model.train()
         return total_loss
+
+    def plot_reconstruction(self, data: np.ndarray,
+                            folder_path: str,
+                            lengths: Optional[List[int]]=None,
+                            channel_idx: List[int]=[0, 1, 2],
+                            ):
+        """
+        Parameters
+        ----------
+        data : numpy.ndarray
+            2-dimensional array of shape
+            (length, channels)
+        folder_path : str
+            the folder path to which the reconstruction
+            figure should be saved.
+        lengths : List[int], optional
+            if given, the train-validation-test
+            split points will be plotted.
+        channel_idx : list of int, optional
+            A list of channel indices to plot. \n
+            Default is 0, 1, 2.
+
+        Notes
+        -----
+        If length of data is not divisible by self.recon_len,
+        the last section will be cut off and ignored.
+        """
+        self.model.eval()
+
+        if data.shape[1] < 3:
+            channel_idx = list(range(data.shape[1]))
+
+        segments = []
+        for start_idx in range(0, data.data.shape[0], self.recon_len):
+            end_idx = start_idx + self.recon_len
+            if end_idx < data.shape[0]:
+                segments.append(data[start_idx : end_idx])
+
+        reconstructed_data = []
+        for segment in segments:
+            batch_x = torch.Tensor(segment).unsqueeze(0)  # (1, recon_len, channels)
+            batch_idx = torch.tensor([0])
+            x_rec = self.model(batch_x, batch_idx, return_x_rec=True)
+            reconstructed_data.append(x_rec.squeeze(0))
+
+        recon = torch.cat(reconstructed_data, dim=0).cpu().detach().numpy()
+
+        file_path = f'{folder_path}/recon_full.pdf'
+        fig, axes = plot_reconstruction_for_channels(data, recon, channel_idx)
+
+        for ax in axes:
+            ax.axvline(x=lengths[0], color='red', linestyle='--',
+                       label="Train-Val Split")
+            ax.axvline(x=lengths[0] + lengths[1], color='green',
+                       linestyle='--', label="Val-Test Split")
+            ax.legend()
+            
+        plt.tight_layout()
+        plt.savefig(file_path)
+        plt.close(fig)
