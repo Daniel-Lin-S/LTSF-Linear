@@ -1,7 +1,7 @@
 import os
 import pandas as pd
-import os
 from math import gcd
+import numpy as np
 from torch.utils.data import Dataset
 from sklearn.preprocessing import StandardScaler
 from utils.timefeatures import time_features
@@ -167,7 +167,7 @@ class Base_Dataset(Dataset, ABC):
             data_stamp = data_stamp.transpose(1, 0)
         return data_stamp
     
-    def _scale(self, border1s, border2s, df_data):
+    def _scale(self, border1s, border2s, df_data: pd.DataFrame):
         """
         Fit and scale the data, using only the training
         data.
@@ -184,8 +184,25 @@ class Base_Dataset(Dataset, ABC):
         assert hasattr(self, 'data'), (
             "data is not assigned by read data method!"
         )
+        assert isinstance(self.data, np.ndarray), (
+            "data must be a numpy array"
+        )
+        assert self.data.ndim == 2, (
+            "data must be an array of shape (length, channels) "
+        )
         assert hasattr(self, 'data_stamp'), (
             "data_stamp is not assigned by read data method!"
+        )
+        assert isinstance(self.data_stamp, np.ndarray), (
+            "data_stamp must be a numpy array"
+        )
+        assert self.data_stamp.ndim == 2, (
+            "data_stamp must be an array of shape (length, features) "
+        )
+        assert self.data_stamp.shape[0] == self.data.shape[0], (
+            "data_stamp must have consistent length with data"
+            f"actual lengths: stamp - {self.data_stamp.shape[0]}, "
+            f"data - {self.data.shape[0]}"
         )
 
 
