@@ -75,7 +75,7 @@ class Exp_Main(Exp_Basic):
         """
         super(Exp_Main, self).__init__(args)
 
-    def _build_model(self):
+    def _build_model(self, model_args=None):
         model_dict = {
             'Autoformer': Autoformer,
             'Transformer': Transformer,
@@ -84,15 +84,18 @@ class Exp_Main(Exp_Basic):
             'NLinear': NLinear,
             'Linear': Linear,
         }
-        if self.args.model not in model_dict:
+
+        args = model_args if model_args is not None else self.args
+
+        if args.model not in model_dict:
             raise ValueError(
-                f"Invalid model name '{self.args.model}'. Available models are: "
+                f"Invalid model name '{args.model}'. Available models are: "
                 + ", ".join(model_dict.keys())
             )
-        model = model_dict[self.args.model].Model(self.args).float()
+        model = model_dict[args.model].Model(args).float()
 
-        if self.args.use_multi_gpu and self.args.use_gpu:
-            model = nn.DataParallel(model, device_ids=self.args.device_ids)
+        if args.use_multi_gpu and args.use_gpu:
+            model = nn.DataParallel(model, device_ids=args.device_ids)
 
         total_params = sum(p.numel() 
                            for p in model.parameters() 
@@ -143,7 +146,7 @@ class Exp_Main(Exp_Basic):
         outputs = outputs[:, -self.args.pred_len:, f_dim:]
         batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
             
-        return batch_y,outputs
+        return batch_y, outputs
 
     def _compute_pred_loss(self, criterion: callable,
                            batch_y, outputs):
@@ -416,10 +419,6 @@ class Exp_Main(Exp_Basic):
         inputx = np.concatenate(inputx, axis=0)
 
         ### result save ###
-        folder_path = './results/' + setting + '/'
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
         metrics = metric(preds, trues)
         print('mse:{}, mae:{}'.format(metrics['mse'], metrics['mae']))
 
@@ -432,6 +431,9 @@ class Exp_Main(Exp_Basic):
         f.write('\n')
 
         if save_all:
+            folder_path = './results/' + setting + '/'
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
             np.savez(folder_path + 'metrics.npz', **metrics)
             np.save(folder_path + 'pred.npy', preds)
             np.save(folder_path + 'true.npy', trues)

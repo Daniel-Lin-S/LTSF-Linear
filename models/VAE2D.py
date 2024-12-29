@@ -130,6 +130,11 @@ class VAE2D(nn.Module):
         :param folder_path: path to the folder in which
           the reconstruction figures will be plotted.
           Only used if save_recon=True
+
+        Notes
+        -----
+        input and output are both of shape
+        (batch_size, length, channels)
         """
         if beta is None: # use default value
             beta = self.config['vae']['beta']
@@ -161,7 +166,7 @@ class VAE2D(nn.Module):
 
         if return_x_rec:
             x_rec = xhat_l + xhat_h
-            return x_rec
+            return rearrange(x_rec, 'b c l -> b l c')
 
         ### Compute Losses ###
         recons_loss = {
@@ -182,13 +187,10 @@ class VAE2D(nn.Module):
 
         ### plot `x` and `xhat` (reconstruction) ###
         if save_recon:
-            print('Reconstruction losses when plotted: '
-                  f"LF: {recons_loss['LF.time'].item()}, HF: {recons_loss['HF.time'].item()}")
             file_path = os.path.join(
                 folder_path, 'recon_' + str(batch_idx) + '.pdf')
             plot_lfhf_reconstruction(
-                x_l, xhat_l, x_h, xhat_h,
-                step=batch_idx, file_path=file_path)
+                x_l, xhat_l, x_h, xhat_h, file_path=file_path)
 
         return recons_loss, kl_losses
 

@@ -1,6 +1,6 @@
 encoder:
   init_dim: 4  # initial dimension
-  hid_dim: 128  # hidden dimension in the bottleneck
+  hid_dim: 64  # hidden dimension in the bottleneck
   # number of residual blocks between down-sampling blocks
   n_resnet_blocks: 2
   downsampling: 'time'    # 'time' 'freq'
@@ -22,13 +22,13 @@ vae:
   # number of Gaussian distributions used in latent space
   latent_dim: 128
   # whether to assign distribution to each time stamp or each time-frequency point
-  latent_type: 'spatial'  # 'spatial' 'time'
+  latent_type: 'time'  # 'spatial' 'time'
   beta: 0.  # the weight of beta-VAE, if set to 1, same as VAE
   beta_init: 0.
 
 ### for STFT ###
 # number of FFT points
-n_fft: 8  # for efficient computation, use power of 2
+n_fft: 16  # for efficient computation, use power of 2
 stft_split_type: 'real_imag'  # 'real_imag' 'magnitude_phase'
 
 codebook_sizes:

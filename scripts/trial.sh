@@ -14,9 +14,8 @@ python -u run_longExp.py \
   --seq_len 336 \
   --pred_len 96 \
   --enc_in 8 \
-  --des 'Trial' \
   --itr 1 \
-  --train_epochs 1 \
+  --train_epochs 5 \
   --batch_size 8  \
   --learning_rate 0.005 \
   --num_workers 0 \
