@@ -322,35 +322,44 @@ def plot_lfhf_reconstruction(x_l, xhat_l, x_h, xhat_h,
     alpha = 0.7  # transparency
     n_rows = 3  # LF, HF, combined
     fig, axes = plt.subplots(n_rows, 1, figsize=(4, 2 * n_rows))
-    title = f"channel idx:{c} \n (blue:GT, orange:reconstructed)"
+    title = f"channel idx:{c} \n (blue:Ground Truth, orange:reconstructed)"
     if step is not None:
         title = f"step-{step} | {title}"
     plt.suptitle(title)
 
     # Plot low-frequency component
-    axes[0].plot(x_l[b, c].cpu(), alpha=alpha, label="Ground Truth")
+    u_l = x_l[b, c].cpu()
+    u_l_recon = xhat_l[b, c].detach().cpu()
+    axes[0].plot(u_l, alpha=alpha)
     axes[0].plot(
-        xhat_l[b, c].detach().cpu(), alpha=alpha, label="Reconstructed")
+        u_l_recon, alpha=alpha)
     axes[0].set_title(r'$x_l$ (LF)')
-    axes[0].set_ylim(-4, 4)
-    axes[0].legend(fontsize=8)
+    y_min_l, y_max_l = min(u_l.min(), u_l_recon.min()), \
+                    max(u_l.max(), u_l.max())
+    axes[0].set_ylim(y_min_l - 0.1, y_max_l + 0.1)
 
     # Plot high-frequency component
-    axes[1].plot(x_h[b, c].cpu(), alpha=alpha, label="Ground Truth")
+    u_h = x_h[b, c].cpu()
+    u_h_recon = xhat_h[b, c].detach().cpu()
+    axes[1].plot(u_h, alpha=alpha)
     axes[1].plot(
-        xhat_h[b, c].detach().cpu(), alpha=alpha, label="Reconstructed")
+        u_h_recon, alpha=alpha)
     axes[1].set_title(r'$x_h$ (HF)')
-    axes[1].set_ylim(-4, 4)
-    axes[1].legend(fontsize=8)
+    y_min_h, y_max_h = min(u_h.min(), u_h_recon.min()), \
+                    max(u_h.max(), u_h_recon.max())
+    axes[1].set_ylim(y_min_h - 0.1, y_max_h + 0.1)
 
     # Plot combined components
+    u = x_l[b, c].cpu() + x_h[b, c].cpu()
+    u_recon = xhat_l[b, c].detach().cpu() + xhat_h[b, c].detach().cpu()
     axes[2].plot(
-        x_l[b, c].cpu() + x_h[b, c].cpu(), alpha=alpha, label="Ground Truth")
-    axes[2].plot(xhat_l[b, c].detach().cpu() + xhat_h[b, c].detach().cpu(),
-                 alpha=alpha, label="Reconstructed")
+        u, alpha=alpha)
+    axes[2].plot(u_recon,
+                 alpha=alpha)
     axes[2].set_title(r'$x$ (LF+HF)')
-    axes[2].set_ylim(-4, 4)
-    axes[2].legend(fontsize=8)
+    y_min, y_max = min(u.min(), u_recon.min()), \
+                    max(u.max(), u_recon.max())
+    axes[2].set_ylim(y_min - 0.1, y_max + 0.1)
 
     plt.tight_layout()
 

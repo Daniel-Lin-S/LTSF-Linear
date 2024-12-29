@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from typing import Optional
+from typing import Optional, List
 import os
 import yaml
 import argparse
@@ -159,7 +159,8 @@ class StandardScaler():
 
 
 def visual(true: np.ndarray, preds: Optional[np.ndarray]=None,
-           name='./pic/test.pdf'):
+           title: Optional[str]=None,
+           file_path: str='test.pdf'):
     """
     plot a time-series,
     with predicted values if provided.
@@ -174,6 +175,10 @@ def visual(true: np.ndarray, preds: Optional[np.ndarray]=None,
         The predicted time-series data to be plotted. \n
         Should have shape (n_samples,). \n
         If not provided, only the ground truth will be plotted.
+
+    title : str, optional
+        If given, this will be used as plot title.
+        Otherwise, no title for the plot.
         
     name : str, optional
         The file path where the plot will be saved. \n
@@ -181,27 +186,44 @@ def visual(true: np.ndarray, preds: Optional[np.ndarray]=None,
         Default is './pic/test.pdf'.
     """
     plt.figure()
+    if title:
+        plt.title(title)
     plt.plot(true, label='GroundTruth', linewidth=2)
     if preds is not None:
         plt.plot(preds, label='Prediction', linewidth=2)
     plt.legend()
-    plt.savefig(name, bbox_inches='tight')
+    plt.savefig(file_path, bbox_inches='tight')
 
 
-def visualise_results(folder_path, i, batch_x, pred, true):
+def visualise_results(folder_path, i, batch_x: torch.Tensor,
+                      pred: np.ndarray, true: np.ndarray,
+                      channel_idx: Optional[int]=None):
     """
     Visualise true time series vs prediction for the
     first sample of the batch.
 
-    Notes
-    -----
-    Only the last channel (variable) will be plotted.
+    Parameters
+    ----------
+    i : int
+        the batch index
+    batch_x : torch.Tensor
+        the input series
+    pred, true : np.ndarray
+        the predicted and ground truth values.
+    channel_idx : int
+        if given, the channel will be plotted.
+        Otherwise, a random channel is selected
     """
     input = batch_x.detach().cpu().numpy()
+    num_channels = input.shape[2]  # Number of channels
+    if channel_idx is None:
+        channel_idx = np.random.choice(num_channels)
     # concatenate batches
-    gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
-    pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
-    visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
+    gt = np.concatenate((input[0, :, channel_idx], true[0, :, channel_idx]), axis=0)
+    pd = np.concatenate((input[0, :, channel_idx], pred[0, :, channel_idx]), axis=0)
+    visual(gt, pd,
+           file_path=os.path.join(folder_path, 'pred_' + str(i) + '.pdf'),
+           title=f'Prediction of channel {channel_idx}')
 
 
 def test_params_flop(model: torch.nn.Module, x_shape) -> None:
@@ -281,3 +303,57 @@ def split_args_two_stages(args: argparse.Namespace):
     pred_args = argparse.Namespace(**pred_args)
 
     return recon_args, pred_args
+
+
+def plot_reconstruction_for_channels(
+        origin: np.ndarray, recon: np.ndarray,
+        channels_to_plot: List[int],
+        save_path: Optional[str]=None):
+    """
+    Plots the original and reconstructed time-series sequences
+    for selected channels, and saves the figure.
+
+    Parameters
+    ----------
+    origin, recon : numpy.ndarray
+        The original and reconstructed time-series data with shape
+        (time_steps, channels).
+
+    channels_to_plot : list of int
+        A list of channel indices to plot. \n
+
+    save_path : str, optional
+        The path where the generated plot will be saved.
+        If not given, the canvas will be returned,
+        but nothing saved. Please use plt.show()
+        or plt.savefig() outside in this case.
+
+    Returns
+    -------
+    None
+        If save_path is given.
+    fig, axes
+        the canvas of matplotlib
+        with the reconstruction figure
+    """
+    # Plot original vs reconstructed for selected channels
+    fig, axes = plt.subplots(
+        len(channels_to_plot), 1,
+        figsize=(10, len(channels_to_plot) * 5))
+
+    fig.suptitle('Reconstruction of the Full Series')
+
+    for i, channel in enumerate(channels_to_plot):
+        # Plot original sequence
+        axes[i].plot(origin[:, channel], label="Original", alpha=0.7)
+        axes[i].plot(recon[:, channel], label="Reconstructed", alpha=0.7)
+        axes[i].set_title(f"Channel {channel}")
+        axes[i].legend()
+
+    # Save the figure to the specified path
+    if save_path:
+        plt.tight_layout()
+        plt.savefig(save_path)
+        plt.close()
+    else:
+        return fig, axes
