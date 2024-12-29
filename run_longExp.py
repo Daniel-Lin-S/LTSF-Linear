@@ -19,7 +19,7 @@ parser.add_argument('--train_only', type=bool, required=False, default=False,
 parser.add_argument('--model_id', type=str, required=True, help='model id')
 parser.add_argument('--model', type=str, required=True,
                     help='model name, options: [Autoformer, Informer, Transformer, DLinear, Linear, NLinear]')
-parser.add_argument('--des', type=str, default='test',
+parser.add_argument('--des', type=str, default='',
                     help='experiment description added at the end of folder name')
 
 # data loader

@@ -29,7 +29,7 @@ parser.add_argument('--model_pred', type=str, required=True,
                     '[Autoformer, Informer, Transformer, DLinear, Linear, NLinear]')
 parser.add_argument('--train_only', type=bool, required=False, default=False,
                     help='perform training on full input dataset without validation and testing')
-parser.add_argument('--des', type=str, default='test',
+parser.add_argument('--des', type=str, default='',
                     help='experiment description added at the end of folder name')
 
 # data loader
@@ -113,6 +113,9 @@ parser.add_argument('--learning_rate_recon', type=float, default=0.0001,
 parser.add_argument('--learning_rate_pred', type=float, default=0.001,
                     help='initial optimizer learning rate for prediction model')
 parser.add_argument('--loss', type=str, default='mse', help='loss function')
+parser.add_argument('--loss_level', type=str, default='latent',
+                    help='One of latent and origin. Latent: prediction model trained at latent level'
+                    '; origin: prediction model trained after decoding.')
 parser.add_argument('--lradj', type=str, default='type1', help='adjust learning rate')
 parser.add_argument('--use_amp', action='store_true',
                     help='use automatic mixed precision training', default=False)
@@ -138,7 +141,7 @@ if args.use_gpu and args.use_multi_gpu:
 print('Args in experiment:')
 print(args)
 
-base_setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_loss[{}]_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_{}'.format(
+base_setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_loss[{}_{}]_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_{}'.format(
     args.model_id,
     args.model_recon,
     args.model_pred,
@@ -147,6 +150,7 @@ base_setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_loss[{}]_dm{}_nh{}_el{}_dl{}_df{}_f
     args.label_len,
     args.pred_len,
     args.loss,
+    args.loss_level,
     args.d_model,
     args.n_heads,
     args.e_layers,

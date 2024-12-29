@@ -40,6 +40,9 @@ class Exp_VAE2D_Pred(Exp_Main):
             training the VAE2D modle
         """
         self.args = args
+        assert self.args.loss_level in ['latent', 'origin'], (
+            'loss_level must be one of latent and origin'
+        )
         self.device = self._acquire_device()
         self._load_vae_model(model_path, vae_config)
 
@@ -207,34 +210,33 @@ class Exp_VAE2D_Pred(Exp_Main):
 
         reconstructed_segments = []
 
-        with torch.no_grad():
-            for seg_l, seg_h in zip(segments_l, segments_h):
-                # Split into low-frequency (LF) and high-frequency (HF) components
-                latent_dim_l = seg_l.size(-1) // 2  # latent dimensions (mu_l, log_var_l)
-                latent_dim_h = seg_h.size(-1) // 2
-                mu_l, log_var_l = seg_l[:, :, :latent_dim_l], seg_l[:, :, latent_dim_l:]
-                mu_h, log_var_h = seg_h[:, :, :latent_dim_h], seg_h[:, :, latent_dim_h:]
+        for seg_l, seg_h in zip(segments_l, segments_h):
+            # Split into low-frequency (LF) and high-frequency (HF) components
+            latent_dim_l = seg_l.size(-1) // 2  # latent dimensions (mu_l, log_var_l)
+            latent_dim_h = seg_h.size(-1) // 2
+            mu_l, log_var_l = seg_l[:, :, :latent_dim_l], seg_l[:, :, latent_dim_l:]
+            mu_h, log_var_h = seg_h[:, :, :latent_dim_h], seg_h[:, :, latent_dim_h:]
 
-                z_l = self.pretrained_vae.reparameterize(mu_l, log_var_l)
-                z_h = self.pretrained_vae.reparameterize(mu_h, log_var_h)
+            z_l = self.pretrained_vae.reparameterize(mu_l, log_var_l)
+            z_h = self.pretrained_vae.reparameterize(mu_h, log_var_h)
 
-                # Rearrange back to (batch_size, hid_dim, h, w) for decoding
-                d, h = self.pretrained_vae.hid_dim, self.pretrained_vae.h
-                if self.pretrained_vae.latent_type == 'spatial':
-                    z_l = rearrange(z_l, 'b w (h d) -> b h w d', h=h, d=d)
-                    z_h = rearrange(z_h, 'b w (h d) -> b h w d', h=h, d=d)
-                    z_l = self.pretrained_vae.project_l(z_l)
-                    z_h = self.pretrained_vae.project_h(z_h)
-                    z_l = rearrange(z_l, 'b h w d -> b d h w')
-                    z_h = rearrange(z_h, 'b h w d -> b d h w')
-                elif self.pretrained_vae.latent_type == 'time':
-                    z_l = self.pretrained_vae.project_l(z_l)
-                    z_h = self.pretrained_vae.project_h(z_h)
-                    z_l = rearrange(z_l, 'b w (d h) -> b d h w', h=h, d=d)
-                    z_h = rearrange(z_h, 'b w (d h) -> b d h w', h=h, d=d)
+            # Rearrange back to (batch_size, hid_dim, h, w) for decoding
+            d, h = self.pretrained_vae.hid_dim, self.pretrained_vae.h
+            if self.pretrained_vae.latent_type == 'spatial':
+                z_l = rearrange(z_l, 'b w (h d) -> b h w d', h=h, d=d)
+                z_h = rearrange(z_h, 'b w (h d) -> b h w d', h=h, d=d)
+                z_l = self.pretrained_vae.project_l(z_l)
+                z_h = self.pretrained_vae.project_h(z_h)
+                z_l = rearrange(z_l, 'b h w d -> b d h w')
+                z_h = rearrange(z_h, 'b h w d -> b d h w')
+            elif self.pretrained_vae.latent_type == 'time':
+                z_l = self.pretrained_vae.project_l(z_l)
+                z_h = self.pretrained_vae.project_h(z_h)
+                z_l = rearrange(z_l, 'b w (d h) -> b d h w', h=h, d=d)
+                z_h = rearrange(z_h, 'b w (d h) -> b d h w', h=h, d=d)
 
-                reconstructed_segment = self.pretrained_vae.decode(z_l, z_h)
-                reconstructed_segments.append(reconstructed_segment)
+            reconstructed_segment = self.pretrained_vae.decode(z_l, z_h)
+            reconstructed_segments.append(reconstructed_segment)
 
         return torch.cat(reconstructed_segments, dim=1)
     
@@ -254,12 +256,20 @@ class Exp_VAE2D_Pred(Exp_Main):
 
         if calculate_loss:
             batch_y = batch_y.float().to(self.device)
-            batch_y = batch_y[:, -self.args.pred_len:,:]
-            y_segments = self._segment_sequence(batch_y, self.recon_len)
-            y_latents_l, y_latents_h = self._process_latents(y_segments)
-            loss_l = criterion(pred_latents_l, y_latents_l)
-            loss_h = criterion(pred_latents_h, y_latents_h)
-            return loss_l, loss_h
+            if self.args.loss_level == 'latent':
+                batch_y = batch_y[:, -self.args.pred_len:,:]  # remove label_len
+                y_segments = self._segment_sequence(batch_y, self.recon_len)
+                true_latents_l, true_latents_h = self._process_latents(y_segments)
+                loss_l = criterion(pred_latents_l, true_latents_l)
+                loss_h = criterion(pred_latents_h, true_latents_h)
+                return loss_l, loss_h
+            elif self.args.loss_level == 'origin':
+                pred_seq = self._reconstruct_sequence(
+                    pred_latents_l, pred_latents_h)
+
+                true_seq, pred_seq = self._extract_prediction(batch_y, pred_seq)
+                loss = criterion(true_seq, pred_seq)
+                return loss
         else:
             return pred_latents_l, pred_latents_h
 
@@ -291,56 +301,97 @@ class Exp_VAE2D_Pred(Exp_Main):
             epoch_start_time = time.time()
             self.model_l.train()
             self.model_h.train()
-            train_loss_l = []
-            train_loss_h = []
+            if self.args.loss_level == 'latent':
+                train_loss_l = []
+                train_loss_h = []
+            elif self.args.loss_level == 'origin':
+                train_loss = []
+                
             for i, (batch_x, batch_y, _, _) in enumerate(train_loader):
                 batch_start_time = time.time()
 
-                # Segment, encode, and concatenate latents
-                loss_l, loss_h = self._predict_batch(batch_x, batch_y, criterion)
+                if self.args.loss_level == 'latent':
+                    loss_l, loss_h = self._predict_batch(batch_x, batch_y, criterion)
 
-                model_optim_l.zero_grad()
-                loss_l.backward(retain_graph=True)  # Retain computation graph for HF backprop
-                model_optim_l.step()
-                train_loss_l.append(loss_l.item())
+                    model_optim_l.zero_grad()
+                    loss_l.backward(retain_graph=True)  # Retain computation graph for HF backprop
+                    model_optim_l.step()
+                    train_loss_l.append(loss_l.item())
 
-                model_optim_h.zero_grad()
-                loss_h.backward()
-                model_optim_h.step()
-                train_loss_h.append(loss_h.item())
+                    model_optim_h.zero_grad()
+                    loss_h.backward()
+                    model_optim_h.step()
+                    train_loss_h.append(loss_h.item())
 
-                if i % log_interval == 0:
-                    print(f"Epoch [{epoch + 1}/{self.args.train_epochs}], "
-                        f"Batch [{i}/{len(train_loader)}], "
-                        f"Time taken per batch: {time.time()-batch_start_time:.2f}s, "
-                        f"Average batch Loss LF: {np.mean(train_loss_l):.4f}, "
-                        f"Average batch Loss HF: {np.mean(train_loss_h):.4f}")
+                    if i % log_interval == 0:
+                        print(f"Epoch [{epoch + 1}/{self.args.train_epochs}], "
+                            f"Batch [{i}/{len(train_loader)}], "
+                            f"Time taken per batch: {time.time()-batch_start_time:.2f}s, "
+                            f"Average batch Loss LF: {np.mean(train_loss_l):.4f}, "
+                            f"Average batch Loss HF: {np.mean(train_loss_h):.4f}")
+                elif self.args.loss_level == 'origin':
+                    loss = self._predict_batch(batch_x, batch_y, criterion)
+
+                    # use the loss to update both models
+                    model_optim_l.zero_grad()
+                    model_optim_h.zero_grad()
+                    loss.backward()
+                    model_optim_l.step()
+                    model_optim_h.step()
+                    train_loss.append(loss.item())
+
+                    if i % log_interval == 0:
+                        print(f"Epoch [{epoch + 1}/{self.args.train_epochs}], "
+                            f"Batch [{i}/{len(train_loader)}], "
+                            f"Time taken per batch: {time.time()-batch_start_time:.2f}s, "
+                            f"Average batch Loss: {np.mean(train_loss):.4f}")
 
             # Validation and epoch logging
             epoch_duration = time.time() - epoch_start_time
             if vali_loader is not None:
-                vali_loss_l, vali_loss_h = self.vali(vali_loader, criterion)
+                if self.args.loss_level == 'latent':
+                    vali_loss_l, vali_loss_h = self.vali(vali_loader, criterion)
+                    vali_loss = vali_loss_l + vali_loss_h
 
-                print(
-                    f"Epoch {epoch + 1}/{self.args.train_epochs}, "
-                    f"Time taken: {epoch_duration:.2f}s, "
-                    f"Train Loss LF: {np.mean(train_loss_l):.4f}, "
-                    f"Train Loss HF: {np.mean(train_loss_h):.4f}, "
-                    f"Val Loss LF: {vali_loss_l:.4f}, "
-                    f"Val Loss HF: {vali_loss_h:.4f}"
-                )
-                early_stopping(vali_loss_l+vali_loss_h,
-                               [self.model_l, self.model_h], path)
+                    print(
+                        f"Epoch {epoch + 1}/{self.args.train_epochs}, "
+                        f"Time taken: {epoch_duration:.2f}s, "
+                        f"Train Loss LF: {np.mean(train_loss_l):.4f}, "
+                        f"Train Loss HF: {np.mean(train_loss_h):.4f}, "
+                        f"Val Loss LF: {vali_loss_l:.4f}, "
+                        f"Val Loss HF: {vali_loss_h:.4f}"
+                    )
+                elif self.args.loss_level == 'origin':
+                    vali_loss = self.vali(vali_loader, criterion)
+                    print(
+                        f"Epoch {epoch + 1}/{self.args.train_epochs}, "
+                        f"Time taken: {epoch_duration:.2f}s, "
+                        f"Train Loss: {np.mean(train_loss):.4f}, "
+                        f"Val Loss: {vali_loss:.4f}. "
+                    )
+
+                early_stopping(vali_loss,
+                            [self.model_l, self.model_h], path)
             else:
-                train_loss = np.mean(train_loss_l) + np.mean(train_loss_h)
-                print(
-                    f"Epoch {epoch + 1}/{self.args.train_epochs}, "
-                    f"Time taken: {epoch_duration:.2f}s, "
-                    f"Train Loss LF: {np.mean(train_loss_l):.4f}, "
-                    f"Train Loss HF: {np.mean(train_loss_h):.4f}"
-                )
-                early_stopping(train_loss,
-                               [self.model_l, self.model_h], path)
+                if self.args.loss_level == 'latent':
+                    mean_loss_l = np.mean(train_loss_l)
+                    mean_loss_h = np.mean(train_loss_h)
+                    mean_loss = mean_loss_l + mean_loss_h
+                    print(
+                        f"Epoch {epoch + 1}/{self.args.train_epochs}, "
+                        f"Time taken: {epoch_duration:.2f}s, "
+                        f"Train Loss LF: {mean_loss_l:.4f}, "
+                        f"Train Loss HF: {mean_loss_h:.4f}"
+                    )
+                elif self.args.loss_level == 'origin':
+                    mean_loss = np.mean(train_loss)
+                    print(
+                        f"Epoch {epoch + 1}/{self.args.train_epochs}, "
+                        f"Time taken: {epoch_duration:.2f}s, "
+                        f"Train Loss: {mean_loss:.4f}, "
+                    )
+                early_stopping(mean_loss,
+                            [self.model_l, self.model_h], path)
 
             adjust_learning_rate(model_optim_l, epoch + 1, self.args)
             adjust_learning_rate(model_optim_h, epoch + 1, self.args)
@@ -348,19 +399,30 @@ class Exp_VAE2D_Pred(Exp_Main):
     def vali(self, vali_loader, criterion: callable) -> Tuple[float, float]:
         self.model_l.eval()
         self.model_h.eval()
+        
+        if self.args.loss_level == 'latent':
+            vali_loss_l = []
+            vali_loss_h = []
+            with torch.no_grad():
+                for _, (batch_x, batch_y, _, _) in enumerate(vali_loader):
+                    # Segment, encode, and process latents
+                    loss_l, loss_h = self._predict_batch(batch_x, batch_y, criterion)
 
-        vali_loss_l = []
-        vali_loss_h = []
+                    vali_loss_l.append(loss_l.item())
+                    vali_loss_h.append(loss_h.item())
 
-        with torch.no_grad():
-            for _, (batch_x, batch_y, _, _) in enumerate(vali_loader):
-                # Segment, encode, and process latents
-                loss_l, loss_h = self._predict_batch(batch_x, batch_y, criterion)
+            return np.mean(vali_loss_l), np.mean(vali_loss_h)
+        elif self.args.loss_level == 'origin':
+            vali_loss = []
+            with torch.no_grad():
+                for _, (batch_x, batch_y, _, _) in enumerate(vali_loader):
+                    # Segment, encode, and process latents
+                    loss = self._predict_batch(batch_x, batch_y, criterion)
 
-                vali_loss_l.append(loss_l.item())
-                vali_loss_h.append(loss_h.item())
+                    vali_loss.append(loss.item())
 
-        return np.mean(vali_loss_l), np.mean(vali_loss_h)
+            return np.mean(vali_loss)
+
 
     def test(self, setting, test: int=0) -> None:
         """
