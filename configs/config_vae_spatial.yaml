@@ -1,6 +1,6 @@
 encoder:
   init_dim: 4  # initial dimension
-  hid_dim: 64  # hidden dimension in the bottleneck
+  hid_dim: 32  # hidden dimension in the bottleneck
   # number of residual blocks between down-sampling blocks
   n_resnet_blocks: 2
   downsampling: 'time'    # 'time' 'freq'
@@ -20,9 +20,9 @@ decoder:
 
 vae:
   # number of Gaussian distributions used in latent space
-  latent_dim: 128
+  latent_dim: 32
   # whether to assign distribution to each time stamp or each time-frequency point
-  latent_type: 'time'  # 'spatial' 'time'
+  latent_type: 'spatial'  # 'spatial' 'time'
   beta: 0.  # the weight of beta-VAE, if set to 1, same as VAE
   beta_init: 0.
 
