@@ -311,7 +311,6 @@ class Dataset_Custom(Base_Dataset):
         if self.features == 'S':
             cols.remove(self.target)
         cols.remove('date')
-        # print(cols)
         border1s, border2s, border1, border2 = self._compute_borders(len(df_raw))
 
         # Process the data based on features

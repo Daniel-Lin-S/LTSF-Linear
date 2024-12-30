@@ -3,6 +3,8 @@ from data_provider.data_loader import (
     Dataset_Custom, Dataset_Pred
 )
 from torch.utils.data import DataLoader
+from utils.logger import Logger
+from typing import Optional
 
 data_dict = {
     'ETTh1': Dataset_ETT_hour,
@@ -13,7 +15,8 @@ data_dict = {
 }
 
 
-def data_provider(args, flag:str, mode:str):
+def data_provider(args, flag:str, mode:str,
+                  logger: Optional[Logger]=None):
     """
     Create the dataset and data loader
 
@@ -55,6 +58,11 @@ def data_provider(args, flag:str, mode:str):
     mode : str
         One of 'pred' and 'recon'.
         Supervised and un-supervised learning tasks
+    
+    logger : any, optional
+        Any logger that is capable of storing message
+        using logger.log() function.
+        See utils.logger
     
     Return
     ------
@@ -100,7 +108,11 @@ def data_provider(args, flag:str, mode:str):
     )
 
     n_iters = len(data_set) // batch_size
-    print(flag, f'{len(data_set)} samples', f'{n_iters} batches')
+    message = f'Dataset {flag}: {len(data_set)} samples, {n_iters} batches'
+    if logger:
+        logger.log(message)
+    else:
+        print(message)
 
     data_loader = DataLoader(
         data_set,

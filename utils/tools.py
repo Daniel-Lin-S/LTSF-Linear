@@ -7,6 +7,8 @@ import yaml
 import argparse
 from copy import deepcopy
 
+from utils.logger import Logger
+
 plt.switch_backend('agg')
 
 
@@ -73,7 +75,7 @@ def adjust_learning_rate(optimizer: torch.optim.Optimizer,
 
 class EarlyStopping:
     def __init__(self, patience=7, verbose=False, delta=0.,
-                 model_labels=None):
+                 model_labels=None, logger: Optional[Logger]=None):
         """
         EarlyStopping class to stop training early
         based on validation loss.
@@ -95,6 +97,7 @@ class EarlyStopping:
         self.val_loss_min = np.Inf
         self.delta = delta
         self.model_labels = model_labels
+        self.logger = logger
 
     def __call__(self, val_loss, models, path):
         score = -val_loss
@@ -103,7 +106,13 @@ class EarlyStopping:
             self.save_checkpoint(val_loss, models, path)
         elif score < self.best_score + self.delta:
             self.counter += 1
-            print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+            message = 'EarlyStopping counter: ' + \
+                f'{self.counter} out of {self.patience}'
+
+            if self.logger:
+                self.logger.log(message, level='debug')
+            else:
+                print(message)
             if self.counter >= self.patience:
                 self.early_stop = True
         else:
@@ -112,11 +121,18 @@ class EarlyStopping:
             self.counter = 0
 
     def save_checkpoint(self, val_loss, models, path):
-        if self.verbose:
+        if self.verbose and self.logger:
+            self.logger.log(
+                f'Validation loss decreased ({self.val_loss_min:.6f}'
+                f' --> {val_loss:.6f}).  Saving model(s) ...',
+                level='debug')
+        elif self.verbose:
             print(
                 f'Validation loss decreased ({self.val_loss_min:.6f}'
-                f' --> {val_loss:.6f}).  Saving model ...')
-        if not isinstance(models, list): # single model
+                f' --> {val_loss:.6f}).  Saving model(s) ...'
+            )
+
+        if not isinstance(models, list):  # single model
             model_label = self.model_labels if (
                 self.model_labels is not None) else f'checkpoint'
             checkpoint_path = f"{path}/{model_label}.pth"
@@ -357,3 +373,18 @@ def plot_reconstruction_for_channels(
         plt.close()
     else:
         return fig, axes
+
+
+def format_large_int(n: int) -> str:
+    """
+    Format large integers into a readable string.
+    Only support thousand(K), million (M) and billion (B).
+    """
+    if n >= 1e9:
+        return f"{n / 1e9:,.2f}B"
+    elif n >= 1e6:
+        return f"{n / 1e6:,.2f}M"
+    elif n >= 1e3:
+        return f"{n / 1e3:,.2f}K"
+    else:
+        return f"{n:,.0f}"
