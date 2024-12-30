@@ -64,12 +64,11 @@ class Exp_VAE2D_Pred(Exp_Main):
 
     def _load_vae_model(self, model_path, vae_config) -> None:
         recon_len = gcd(self.args.seq_len, self.args.pred_len)
-        self.recon_len = recon_len
+        self.args.recon_len = recon_len
         self.pred_segments = self.args.pred_len // recon_len
+
         self.pretrained_vae = VAE2D(
-            in_channels=self.args.enc_in,
-            input_length=recon_len,
-            config=vae_config
+            self.args, vae_config
         )
 
         try:
@@ -95,8 +94,8 @@ class Exp_VAE2D_Pred(Exp_Main):
             batch_y = batch_y.float().to(self.device)
             batch_y = batch_y[:, -self.args.pred_len:,:]
 
-            x_segments = self._segment_sequence(batch_x, self.recon_len)
-            y_segments = self._segment_sequence(batch_y, self.recon_len)
+            x_segments = self._segment_sequence(batch_x, self.args.recon_len)
+            y_segments = self._segment_sequence(batch_y, self.args.recon_len)
             x_latents_l, x_latents_h = self._process_latents(x_segments)
             y_latents_l, y_latents_h = self._process_latents(y_segments)
 
@@ -247,7 +246,7 @@ class Exp_VAE2D_Pred(Exp_Main):
                        calculate_loss: bool=True):
         batch_x = batch_x.float().to(self.device)
 
-        x_segments = self._segment_sequence(batch_x, self.recon_len)
+        x_segments = self._segment_sequence(batch_x, self.args.recon_len)
         x_latents_l, x_latents_h = self._process_latents(x_segments)
 
         # Train latent prediction
@@ -258,7 +257,7 @@ class Exp_VAE2D_Pred(Exp_Main):
             batch_y = batch_y.float().to(self.device)
             if self.args.loss_level == 'latent':
                 batch_y = batch_y[:, -self.args.pred_len:,:]  # remove label_len
-                y_segments = self._segment_sequence(batch_y, self.recon_len)
+                y_segments = self._segment_sequence(batch_y, self.args.recon_len)
                 true_latents_l, true_latents_h = self._process_latents(y_segments)
                 loss_l = criterion(pred_latents_l, true_latents_l)
                 loss_h = criterion(pred_latents_h, true_latents_h)
@@ -280,7 +279,8 @@ class Exp_VAE2D_Pred(Exp_Main):
         dataset, data_loader = data_provider(self.args, flag, 'pred')
         return dataset, data_loader
 
-    def train(self, setting: str) -> None:
+    def train(self, setting: str,
+              log_interval: int=50) -> None:
         _, train_loader = self._get_data(flag='train')
         _, vali_loader = self._get_data(flag='val') if not self.args.train_only else None
 
@@ -294,8 +294,6 @@ class Exp_VAE2D_Pred(Exp_Main):
         path = os.path.join(self.args.checkpoints, setting)
         if not os.path.exists(path):
             os.makedirs(path)
-
-        log_interval = 50  # Log every 'log_interval' batches
 
         for epoch in range(self.args.train_epochs):
             epoch_start_time = time.time()
@@ -323,7 +321,7 @@ class Exp_VAE2D_Pred(Exp_Main):
                     model_optim_h.step()
                     train_loss_h.append(loss_h.item())
 
-                    if i % log_interval == 0:
+                    if (i+1) % log_interval == 0:
                         print(f"Epoch [{epoch + 1}/{self.args.train_epochs}], "
                             f"Batch [{i}/{len(train_loader)}], "
                             f"Time taken per batch: {time.time()-batch_start_time:.2f}s, "

@@ -14,17 +14,19 @@ from utils.time_freq import (
 )
 
 
+# TODO - add an option to turn of the LF-HF separation
+
 class VAE2D(nn.Module):
     """
     Unsupervised learning stage using VAE with
     LF-HF separation and STFT.
     """
-    def __init__(self,
-                 in_channels: int,
-                 input_length: int,
+    def __init__(self, args,
                  config: dict):
         super().__init__()
-        self.input_length = input_length
+        # input shape: (batch_size, input_length, in_channels)
+        self.in_channels = args.enc_in
+        self.input_length = args.recon_len
         self.config = config
 
         self.n_fft = config['n_fft']
@@ -41,24 +43,24 @@ class VAE2D(nn.Module):
         downsampling = config['encoder']['downsampling']
         if downsampling == 'time':
             downsample_rate_l = compute_downsample_rate(
-                input_length, self.n_fft, downsampled_width_l,
+                self.input_length, self.n_fft, downsampled_width_l,
                 downsampling)
             downsample_rate_h = compute_downsample_rate(
-                input_length, self.n_fft, downsampled_width_h,
+                self.input_length, self.n_fft, downsampled_width_h,
                 downsampling)
         elif downsampling == 'freq':
             downsample_rate_l, h = compute_downsample_rate(
-                input_length, self.n_fft, downsampled_height,
+                self.input_length, self.n_fft, downsampled_height,
                 downsampling, return_width=True)
             downsample_rate_h = downsample_rate_l
 
         # encoder
         self.encoder_l = VQVAEEncoder(
-            init_dim, hid_dim, 2 * in_channels, downsample_rate_l,
+            init_dim, hid_dim, 2 * self.in_channels, downsample_rate_l,
             config['encoder']['n_resnet_blocks'], zero_pad_high_freq, self.n_fft,
             config['encoder']['frequency_bandwidth'], downsampling)
         self.encoder_h = VQVAEEncoder(
-            init_dim, hid_dim, 2 * in_channels, downsample_rate_h,
+            init_dim, hid_dim, 2 * self.in_channels, downsample_rate_h,
             config['encoder']['n_resnet_blocks'], zero_pad_low_freq, self.n_fft,
             config['encoder']['frequency_bandwidth'], downsampling)
 
@@ -88,14 +90,14 @@ class VAE2D(nn.Module):
 
         # Decoder
         self.decoder_l = VQVAEDecoder(
-            init_dim, hid_dim, 2 * in_channels,
+            init_dim, hid_dim, 2 * self.in_channels,
             downsample_rate_l, config['decoder']['n_resnet_blocks'],
-            input_length, zero_pad_high_freq, self.n_fft, in_channels,
+            self.input_length, zero_pad_high_freq, self.n_fft, self.in_channels,
             config['encoder']['frequency_bandwidth'], downsampling)
         self.decoder_h = VQVAEDecoder(
-            init_dim, hid_dim, 2 * in_channels,
-            downsample_rate_h, config['decoder']['n_resnet_blocks'], input_length,
-            zero_pad_low_freq, self.n_fft, in_channels,
+            init_dim, hid_dim, 2 * self.in_channels,
+            downsample_rate_h, config['decoder']['n_resnet_blocks'],
+            self.input_length, zero_pad_low_freq, self.n_fft, self.in_channels,
             config['encoder']['frequency_bandwidth'], downsampling)
 
     def reparameterize(self, mu, log_var):
@@ -113,6 +115,21 @@ class VAE2D(nn.Module):
                 " VAE forwarding stopped")
         eps = torch.randn_like(std)
         return mu + eps * std
+    
+    def _check_input(self, batch_x: torch.Tensor) -> None:
+        if torch.isnan(batch_x).any():
+            raise ValueError(
+                'Input cannot have nan values'
+            )
+        if batch_x.ndim != 3 or (
+            batch_x.shape[1] != self.input_length) or (
+            batch_x.shape[2] != self.in_channels
+        ):
+            raise AssertionError(
+                'input shape does not match with the settings. '
+                f'Expected: (batch_size, {self.input_length}, {self.in_channels})'
+                f', actual: {batch_x.shape}'
+            )
 
     def forward(self, batch_x: torch.Tensor, batch_idx: int,
                 beta: Optional[float]=None,
@@ -139,10 +156,7 @@ class VAE2D(nn.Module):
         if beta is None: # use default value
             beta = self.config['vae']['beta']
         
-        if torch.isnan(batch_x).any():
-            raise ValueError(
-                'Input cannot have nan values'
-            )
+        self._check_input(batch_x)
 
         # input shape (batch_size, length, channels)
         x = rearrange(batch_x, 'b l c -> b c l')
@@ -169,20 +183,20 @@ class VAE2D(nn.Module):
             return rearrange(x_rec, 'b c l -> b l c')
 
         ### Compute Losses ###
-        recons_loss = {
-            'LF.time': F.mse_loss(x_l, xhat_l),
-            'HF.time': F.l1_loss(x_h, xhat_h)
-        }
         kl_loss_l = -0.5 * torch.sum(
             1 + log_var_l - mu_l.pow(2) - log_var_l.exp())
         kl_loss_h = -0.5 * torch.sum(
             1 + log_var_h - mu_h.pow(2) - log_var_h.exp())
 
         kl_loss = beta * (kl_loss_l + kl_loss_h)
-        kl_losses = {
-            'combined': kl_loss,
-            'LF': kl_loss_l,
-            'HF': kl_loss_h
+        recon_loss_l = F.mse_loss(x_l, xhat_l)
+        recon_loss_h = F.l1_loss(x_h, xhat_h)
+
+        loss_dict = {
+            'KL': kl_loss,
+            'recon.LF.time': recon_loss_l,
+            'recon.HF.time': recon_loss_h,
+            'total': recon_loss_l + recon_loss_h + kl_loss
         }
 
         ### plot `x` and `xhat` (reconstruction) ###
@@ -192,7 +206,7 @@ class VAE2D(nn.Module):
             plot_lfhf_reconstruction(
                 x_l, xhat_l, x_h, xhat_h, file_path=file_path)
 
-        return recons_loss, kl_losses
+        return loss_dict
 
     def _vae_process(self, z: torch.Tensor, 
                      fc_mu: torch.nn.Module,
