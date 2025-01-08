@@ -8,7 +8,7 @@ fi
 seq_len=336
 model_name=NLinear
 repeat=3
-gpu_id=2
+gpu_id=0
 for pred_len in 96 192 336 729
 do
 python -u run_longExp.py \
