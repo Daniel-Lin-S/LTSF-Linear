@@ -264,8 +264,10 @@ class VAE2D(nn.Module):
                 file_path = os.path.join(
                     folder_path, 'recon_' + str(batch_idx) + '.pdf')
                 x_hat = rearrange(x_hat, 'b c l -> b l c')
+                x_hat = x_hat.detach().cpu().numpy()
+                x_true = batch_x.detach().cpu().numpy()
                 plot_reconstruction_for_channels(
-                    batch_x[0], x_hat[0], [0, 1, 2], file_path,
+                    x_true[0], x_hat[0], [0, 1, 2], file_path,
                     title=f'Reconstructions of Test Batch {batch_idx}'
                 )
 

@@ -22,4 +22,5 @@ python -u run_reconExp.py \
   --learning_rate_recon 0.001 \
   --learning_rate_pred 0.005 \
   --individual \
+  --num_workers 0 \
   --log_file logs/trial_recon_0beta_recon.log
