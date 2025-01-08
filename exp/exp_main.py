@@ -5,6 +5,7 @@ from utils.tools import (
     EarlyStopping, adjust_learning_rate, visualise_results, test_params_flop
 )
 from utils.metrics import metric, decay_l2_loss
+from utils.logger import Logger
 
 import numpy as np
 import pandas as pd
@@ -12,11 +13,11 @@ import torch
 import torch.nn as nn
 from torch import optim
 
+from typing import Optional
+from tqdm import tqdm
 import os
 import time
-
 import warnings
-import numpy as np
 
 warnings.filterwarnings('ignore')
 
@@ -26,7 +27,7 @@ class Exp_Main(Exp_Basic):
 
     MSE used to 
     """
-    def __init__(self, args):
+    def __init__(self, args, logger: Optional[Logger]=None):
         """
         Parameter
         ---------
@@ -73,7 +74,7 @@ class Exp_Main(Exp_Basic):
             - initialisation of the model.
             
         """
-        super(Exp_Main, self).__init__(args)
+        super(Exp_Main, self).__init__(args, logger)
 
     def _build_model(self, model_args=None):
         model_dict = {
@@ -88,24 +89,29 @@ class Exp_Main(Exp_Basic):
         args = model_args if model_args is not None else self.args
 
         if args.model not in model_dict:
-            raise ValueError(
-                f"Invalid model name '{args.model}'. Available models are: "
-                + ", ".join(model_dict.keys())
-            )
+            error_message = (
+                f"Invalid model name '{args.model}'. "
+                "Available models are: "
+                + ", ".join(model_dict.keys()))
+            
+            if self.logger:
+                self.logger.log(error_message, 'error')
+            else:
+                raise ValueError(
+                    error_message
+                )
+
         model = model_dict[args.model].Model(args).float()
 
         if args.use_multi_gpu and args.use_gpu:
             model = nn.DataParallel(model, device_ids=args.device_ids)
 
-        total_params = sum(p.numel() 
-                           for p in model.parameters() 
-                           if p.requires_grad)
-        print('Number of trainable parameters of the '
-              f'model {self.args.model}: {total_params}')
+        self._print_model(model, self.args.model)
+
         return model
 
     def _get_data(self, flag):
-        data_set, data_loader = data_provider(self.args, flag, 'pred')
+        data_set, data_loader = data_provider(self.args, flag, 'pred', self.logger)
         return data_set, data_loader
 
     def _select_optimizer(self):
@@ -206,7 +212,11 @@ class Exp_Main(Exp_Basic):
         total_loss = []
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
+            vali_bar = tqdm(vali_loader,
+                             desc=f"[Validating]",
+                             leave=False)
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark
+                    ) in enumerate(vali_bar):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float()
 
@@ -249,7 +259,8 @@ class Exp_Main(Exp_Basic):
         time_now = time.time()
 
         train_steps = len(train_loader)
-        early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
+        early_stopping = EarlyStopping(
+            patience=self.args.patience, verbose=True, logger=self.logger)
 
         model_optim = self._select_optimizer()
         criterion = self._get_loss()
@@ -263,7 +274,12 @@ class Exp_Main(Exp_Basic):
 
             self.model.train()
             epoch_time = time.time()
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
+
+            train_bar = tqdm(train_loader,
+                             desc=f"Epoch {epoch} [Training]",
+                             leave=False)
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark
+                    ) in enumerate(train_bar):
                 iter_count += 1
                 model_optim.zero_grad()
                 batch_x = batch_x.float().to(self.device)
@@ -288,9 +304,12 @@ class Exp_Main(Exp_Basic):
                     # print(outputs.shape,batch_y.shape)
                     loss = self._compute_pred_loss(criterion, batch_y, outputs)
                     train_loss.append(loss.item())
+                
+                train_bar.set_postfix(average_loss=np.mean(train_loss))
 
                 if (i + 1) % 100 == 0: # log every 100 steps
-                    self._print_training_loss(time_now, train_steps, epoch, iter_count, i, loss)
+                    self._log_training_loss(
+                        time_now, train_steps, epoch, iter_count, i, loss)
                     iter_count = 0
                     time_now = time.time()
 
@@ -302,48 +321,104 @@ class Exp_Main(Exp_Basic):
                     loss.backward()
                     model_optim.step()
 
-            print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
+            epoch_msg = "Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time)
+            if self.logger:
+                self.logger.log(epoch_msg)
+            else:
+                print(epoch_msg)
+
             train_loss = np.average(train_loss)
             if not self.args.train_only:
                 vali_loss = self.vali(vali_data, vali_loader, criterion)
                 test_loss = self.vali(test_data, test_loader, criterion)
 
-                print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
-                    epoch + 1, train_steps, train_loss, vali_loss, test_loss))
+                msg = "Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
+                    epoch + 1, train_steps, train_loss, vali_loss, test_loss)
+
                 early_stopping(vali_loss, self.model, path)
             else:
-                print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f}".format(
-                    epoch + 1, train_steps, train_loss))
+                msg = "Epoch: {0}, Steps: {1} | Train Loss: {2:.7f}".format(
+                    epoch + 1, train_steps, train_loss)
+
                 early_stopping(train_loss, self.model, path)
+            
+            if self.logger:
+                self.logger.log(msg)
+            else:
+                print(msg)
 
             if early_stopping.early_stop:
-                print("Early stopping")
+                if self.logger:
+                    self.logger.log("Early stopping...")
+                else:
+                    print("Early stopping...")
                 break
 
             adjust_learning_rate(model_optim, epoch + 1, self.args)
+            for param_group in model_optim.param_groups:
+                lr_message = f"Learning Rate updated to {param_group['lr']}"
+                if self.logger:
+                    self.logger.log(lr_message, level='debug')
+                else:
+                    print(lr_message)
 
         best_model_path = path + '/' + 'checkpoint.pth'
         self.model.load_state_dict(torch.load(best_model_path))
 
         return self.model
 
-    def _print_training_loss(self, time_now, train_steps: int,
-                             epoch: int, iter_count: int, i: int, loss):
+    def _log_training_loss(self, prev_time: float, train_steps: int,
+                             epoch: int, iter_count: int, i: int,
+                             loss: torch.Tensor):
         """
         Print a line indicating training time, current loss and epoch number.
-        """
-        print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
-        speed = (time.time() - time_now) / iter_count
-        left_time = speed * ((self.args.train_epochs - epoch) * train_steps - i)
-        print('\tspeed: {:.4f}s/iter; left time: {:.4f}s'.format(speed, left_time))
 
-    def test(self, setting, test=0):
+        Parameters
+        ----------
+        prev_time : float
+            The previoius time stamp recorded
+        train_steps : int
+            Number of training batches in one epoch
+        epoch : int
+            The index of current epoch
+        iter_count : int
+            The index of current batch
+        i : int
+            The index of current batch
+        loss : torch.Tensor
+            The current training loss to be logged
+        """
+        msg1 = "\tEpoch: {0}, Batch: {1} | loss: {2:.7f}".format(
+            epoch + 1, i + 1, loss.item())
+        speed = (time.time() - prev_time) / iter_count
+        left_time = speed * ((self.args.train_epochs - epoch) * train_steps - i)
+        msg2 = '\tspeed: {:.4f}s/iter; Estimated left time: {:.4f}s'.format(
+            speed, left_time)
+        
+        msg = msg1 + msg2
+        if self.logger:
+            self.logger.log(msg, level='debug')
+        else:
+            print(msg)
+
+    def test(self, setting: str, test: int=0):
         test_data, test_loader = self._get_data(flag='test')
         
         if test:
-            print('loading model')
-            self.model.load_state_dict(
-                torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
+            file_path = os.path.join('./checkpoints/' + setting, 'checkpoint.pth')
+            try:
+                self.model.load_state_dict(
+                    torch.load(file_path))
+            except FileNotFoundError:
+                error_msg = (
+                    'Cannot find model checkpoint, please train the model'
+                    ' before testing.'
+                )
+                if self.logger:
+                    self.logger.log(error_msg, 'error')
+                    raise
+                else:
+                    raise Exception(error_msg)
 
         preds = []
         trues = []
@@ -354,7 +429,10 @@ class Exp_Main(Exp_Basic):
 
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+            test_bar = tqdm(test_loader,
+                            desc=f"[Testing]",
+                            leave=False)
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_bar):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
 
@@ -420,7 +498,11 @@ class Exp_Main(Exp_Basic):
 
         ### result save ###
         metrics = metric(preds, trues)
-        print('mse:{}, mae:{}'.format(metrics['mse'], metrics['mae']))
+        metric_msg = 'mse:{}, mae:{}'.format(metrics['mse'], metrics['mae'])
+        if self.logger:
+            self.logger.log(metric_msg)
+        else:
+            print(metric_msg)
 
         # write metrics into a txt file
         f = open("result.txt", 'a')
@@ -445,7 +527,18 @@ class Exp_Main(Exp_Basic):
         if load:
             path = os.path.join(self.args.checkpoints, setting)
             best_model_path = path + '/' + 'checkpoint.pth'
-            self.model.load_state_dict(torch.load(best_model_path))
+            try:
+                self.model.load_state_dict(torch.load(best_model_path))
+            except FileNotFoundError:
+                error_msg = (
+                    'Cannot find model checkpoint, please train the model'
+                    ' before running predict function.'
+                )
+                if self.logger:
+                    self.logger.log(error_msg, 'error')
+                    raise
+                else:
+                    raise Exception(error_msg)
 
         preds = []
 

@@ -1,7 +1,7 @@
 import os
 import torch
 from utils.tools import format_large_int
-from utils.logger import DualLogger
+from utils.logger import Logger
 from abc import ABC, abstractmethod
 from typing import Optional
 
@@ -10,10 +10,16 @@ class Exp_Basic(ABC):
     """
     Base class for experiments
     """
-    def __init__(self, args):
+    def __init__(self, args,
+                 logger: Optional[Logger]=None):
         self.args = args
+        self.logger = logger
         self.device = self._acquire_device()
         self.model = self._build_model().to(self.device)
+    
+    @abstractmethod
+    def _get_data(self):
+        pass
 
     @abstractmethod
     def _build_model(self):
@@ -32,7 +38,7 @@ class Exp_Basic(ABC):
             f"Number of static parameters of the model {model_name}: "
             f"{format_large_int(total_static_params)}. "
         )
-        if hasattr(self, 'logger'):
+        if self.logger:
             self.logger.log(message, level='debug')
         else:
             print(message)
@@ -50,16 +56,12 @@ class Exp_Basic(ABC):
             device = torch.device('cpu')
             message = 'Using CPU'
 
-        if hasattr(self, 'logger'):
+        if self.logger:
             self.logger.log(message)
         else:
             print(message)
 
         return device
-
-    @abstractmethod
-    def _get_data(self):
-        pass
 
     def vali(self):
         pass

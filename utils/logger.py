@@ -101,3 +101,9 @@ class DualLogger(Logger):
         """
         self.log(f">>>>>>>>>>>>>>>>>>>>>>> Finished {stage_name} stage.",
                  level="info")
+        
+    def start_experiment(self, exp_name: str, status: str):
+        self.log('=============================================='
+                 f' Experiment {exp_name}:{status} '
+                 '==============================================',
+                 level='info')

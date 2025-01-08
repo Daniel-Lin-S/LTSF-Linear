@@ -8,20 +8,35 @@ from math import gcd
 from typing import List, Optional
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from inspect import signature
 
 from data_provider.data_factory import data_provider
 from utils.tools import (
     EarlyStopping, adjust_learning_rate, plot_reconstruction_for_channels
 )
 from utils.logger import Logger
-from models.VAE2D import VAE2D
+from models.reconstructors import VAE2D
 from exp.exp_basic import Exp_Basic
 
 
 class Exp_Recon(Exp_Basic):
     """
-    Experiment class for training and testing the VAE2D model
-    for reconstruction tasks.
+    Experiment class for training and testing 
+    a reconstruction model.
+
+    Notes
+    -----
+    - The model must be a torch.nn.Module
+      with forward method taking batch_x, batch_id
+      and other necessary arguments,
+      which can be set up in the _configure_epoch_args function.
+    - The forward method must return a dictionary
+      of the losses.
+    - For visualisation of a batch while validating,
+      define the forward method with
+      save_recon (bool) and folder_path (str)
+      arguments. Otherwise, no batch-wise test figure will be
+      plotted. The folder_path points to test_results folder.
     """
     def __init__(self, args, config, logger: Logger):
         """
@@ -45,8 +60,7 @@ class Exp_Recon(Exp_Basic):
             and print messages into console.
         """
         self.config = config
-        self.logger = logger
-        super(Exp_Recon, self).__init__(args)
+        super(Exp_Recon, self).__init__(args, logger)
 
     def _build_model(self) -> nn.Module:
         """
@@ -180,7 +194,8 @@ class Exp_Recon(Exp_Basic):
 
         train_steps = len(train_loader)
         early_stopping = EarlyStopping(
-            patience=self.args.patience, verbose=True, logger=self.logger)
+            patience=self.args.patience, verbose=True,
+            model_labels='reconstructor', logger=self.logger)
 
         model_optim, scheduler = self._select_optimizer()
 
@@ -259,7 +274,7 @@ class Exp_Recon(Exp_Basic):
 
         # restore the model with lowest validation loss
         self.logger.log('Retrieving the best model ...', level='debug')
-        best_model_path = os.path.join(path, 'checkpoint.pth')
+        best_model_path = os.path.join(path, 'reconstructor.pth')
         self.model.load_state_dict(torch.load(best_model_path))
         test_loss = self.vali(
                 test_data, test_loader, setting, epoch, plot_recon=True,
@@ -304,6 +319,12 @@ class Exp_Recon(Exp_Basic):
         folder_path = './test_results/' + setting
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
+
+        model_params = signature(self.model.forward).parameters
+        save_recon_possible = 'save_recon' in model_params and (
+            'folder_path' in model_params)
+        if save_recon and not save_recon_possible:
+            save_recon = False
 
         with torch.no_grad():
             vali_bar = tqdm(vali_loader,
