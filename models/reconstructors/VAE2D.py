@@ -15,8 +15,6 @@ from utils.time_freq import (
 from utils.tools import compute_kl_loss, plot_reconstruction_for_channels
 
 
-# TODO - add an option to turn of the LF-HF separation
-
 class VAE2D(nn.Module):
     """
     Unsupervised learning stage using VAE with
@@ -32,20 +30,17 @@ class VAE2D(nn.Module):
         self.config = config
 
         self.n_fft = config['n_fft']
-        self.separation = config['lfhf_separation']
         h = round(self.n_fft / 2) + 1  # number of frequency bins
-        self.h = h
+        self.separation = config['lfhf_separation']
         init_dim = config['encoder']['init_dim']
         hid_dim = config['encoder']['hid_dim']
         self.hid_dim = hid_dim
         latent_dim = config['vae']['latent_dim']  # VAE latent dimension
         self.latent_type = config['vae']['latent_type']
-        downsampled_width_l = config['encoder']['downsampled_width']['lf']
-        downsampled_width_h = config['encoder']['downsampled_width']['hf']
-        downsampled_width = config['encoder']['downsampled_width']['combined']
-        downsampled_height = config['encoder']['downsampled_width']['freq']
         downsampling = config['encoder']['downsampling']
         if downsampling == 'time' and self.separation:
+            downsampled_width_l = config['encoder']['downsampled_width']['lf']
+            downsampled_width_h = config['encoder']['downsampled_width']['hf']
             downsample_rate_l = compute_downsample_rate(
                 self.input_length, self.n_fft, downsampled_width_l,
                 downsampling)
@@ -53,11 +48,13 @@ class VAE2D(nn.Module):
                 self.input_length, self.n_fft, downsampled_width_h,
                 downsampling)
         elif downsampling == 'time':
+            downsampled_width = config['encoder']['downsampled_width']['combined']
             downsample_rate = compute_downsample_rate(
                 self.input_length, self.n_fft, downsampled_width,
                 downsampling
             )
         elif downsampling == 'freq':
+            downsampled_height = config['encoder']['downsampled_width']['freq']
             downsample_rate_l, h = compute_downsample_rate(
                 self.input_length, self.n_fft, downsampled_height,
                 downsampling, return_width=True)

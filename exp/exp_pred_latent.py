@@ -1,9 +1,8 @@
-from einops import rearrange
 from data_provider.data_factory import data_provider
 from exp.exp_main import Exp_Main
-from models.reconstructors import VAE2D
 from utils.tools import visualise_results, EarlyStopping, adjust_learning_rate
 from utils.logger import Logger
+from models.reconstructors import VAE2D, AE2D
 
 import numpy as np
 import torch
@@ -11,25 +10,30 @@ import torch.nn as nn
 from torch import optim
 
 import copy
-from math import gcd
 from tqdm import tqdm
+from math import gcd
 import time
 import os
 from typing import List, Tuple, Optional
+from abc import ABC, abstractmethod
 
 
-# TODO - now only supports linear prediction models, should add handling of transformers later (including the labeled length)
+# TODO - adapt to transformers (i.e., including the labeled length)
+# TODO - adapt for models with no LF-HF separation
 # TODO - allow for using different prediction models on LF and HF latents
-# TODO - add support for no LF-HF separation
 
-
-class Exp_VAE2D_Pred(Exp_Main):
+class Exp_Latent_Pred(Exp_Main, ABC):
     """
-    Experiment class for latent prediction with VAE preprocessing.
+    Base Experiment class for latent prediction.
+
+    Notes
+    -----
+    self.model_l and self.model_h correspond to the
+    prediction models for LF and HF components respectively.
     """
     def __init__(self, args, 
                  model_path: str,
-                 vae_config: dict,
+                 model_config: dict,
                  logger: Logger):
         """
         Parameters
@@ -39,9 +43,9 @@ class Exp_VAE2D_Pred(Exp_Main):
         model_path : str
             File path to the pth file containing
             the pre-trained VAE2D model.
-        vae_config: dict
+        model_config: dict
             the configurations used when
-            training the VAE2D modle
+            training the reconstruction model.
         """
         self.args = args
         self.logger = logger
@@ -49,7 +53,7 @@ class Exp_VAE2D_Pred(Exp_Main):
             'loss_level must be one of latent and origin'
         )
         self.device = self._acquire_device()
-        self._load_vae_model(model_path, vae_config)
+        self._load_pretrained_model(model_path, model_config)
 
         shape_xl, shape_xh, shape_yl, shape_yh = self._get_latent_shapes()
 
@@ -68,17 +72,56 @@ class Exp_VAE2D_Pred(Exp_Main):
         model_args_h.enc_in = shape_xh[2]
         self.model_h = self._build_model(model_args_h).to(self.device)
 
-    def _load_vae_model(self, model_path, vae_config) -> None:
+    def _load_pretrained_model(self, model_path: str,
+                               model_config: dict) -> None:
+        """
+        Assign a pre-trained reconstruction model to
+        `self.pretrained_model`. Must be implemented by subclasses
+        of this class.
+
+        Parameters
+        ----------
+        model_path : str
+            file path to which the model checkpoint is stored.
+        model_config : dict
+            the model-specific configurations used
+            when pre-training the model.
+
+        Notes
+        -----
+        model initalisation must take two arguments:
+        args, config. Where args is a Namespace
+        with attributes recon_len (input length)
+        and enc_in (number of input channels)
+        and other training parameters.
+        config is a dictionary taken from
+        a yaml file consisting of the
+        model-specific arguments.
+        """
+        model_dict = {
+            'VAE' : VAE2D,
+            'AE' : AE2D
+        }
+        args = self.args
+        if args.model_recon not in model_dict:
+            self.logger.log(
+                f"Invalid reconstruction model name '{args.model_recon}'. "
+                "Available models are: "
+                + ", ".join(model_dict.keys()),
+                level='error'
+            )
+            raise
+
         recon_len = gcd(self.args.seq_len, self.args.pred_len)
         self.args.recon_len = recon_len
         self.pred_segments = self.args.pred_len // recon_len
 
-        self.pretrained_vae = VAE2D(
-            self.args, vae_config
+        self.pretrained_model = model_dict[args.model_recon](
+            self.args, model_config
         )
 
         try:
-            self.pretrained_vae.load_state_dict(
+            self.pretrained_model.load_state_dict(
                 torch.load(model_path))
         except FileNotFoundError:
             self.logger.log(
@@ -90,11 +133,72 @@ class Exp_VAE2D_Pred(Exp_Main):
             raise
 
         if self.args.use_multi_gpu and self.args.use_gpu:
-            self.pretrained_vae = nn.DataParallel(
-                self.pretrained_vae, device_ids=self.args.device_ids)
+            self.pretrained_model = nn.DataParallel(
+                self.pretrained_model, device_ids=self.args.device_ids)
 
-        self.pretrained_vae.eval()
-        self.pretrained_vae.to(self.device)
+        self.pretrained_model.eval()
+        self.pretrained_model.to(self.device)
+
+    @abstractmethod
+    def _process_latents(self, segments: List[torch.Tensor]
+                         ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Encode segments into latents suitable for time-series prediction.
+
+        Parameters
+        ----------
+        segments : List[torch.Tensor]
+            List of input segments,
+            each of shape (batch_size, seq_len, channels).
+
+        Returns
+        -------
+        torch.Tensor
+            Latents prepared for prediction models,
+            shape (batch_size, total_length, latent_dim),
+            where the last axis includes
+            all the latent channels.
+        """
+        pass
+
+    @abstractmethod
+    def _reconstruct_sequence(self, z_l: torch.Tensor,
+                              z_h: torch.Tensor) -> torch.Tensor:
+        """
+        Decode predicted latents back into the original sequence.
+        Should be defined according to how latents
+        are processed in `_process_latents`.
+
+        Parameters
+        ----------
+        z_l, z_h : torch.Tensor
+            Predicted latent representations,
+            shape (batch_size, total_length, latent_dim).
+
+        Returns
+        -------
+        torch.Tensor
+            Reconstructed sequence of shape (batch_size, total_length, channels).
+        
+        Notes
+        -----
+        You may use self._latent_to_segments
+        to obtain segments_l and segments_h of
+        the adjusted temporal length for decoding
+        directly.
+        """
+        pass
+
+    def _latent_to_segments(self, z_l: torch.Tensor, z_h: torch.Tensor
+                            ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
+        seq_len_l = z_l.shape[1] // self.pred_segments
+        seq_len_h = z_h.shape[1] // self.pred_segments
+
+        # Split latents back into segments
+        segments_l = torch.split(z_l, seq_len_l, dim=1)
+        segments_h = torch.split(z_h, seq_len_h, dim=1)
+
+        return segments_l, segments_h
     
     def _get_latent_shapes(self):
         _, data_loader = self._get_data('train')
@@ -141,119 +245,6 @@ class Exp_VAE2D_Pred(Exp_Main):
             raise
         segments = [x[:, i:i+seq_len, :] for i in range(0, x.size(1), seq_len)]
         return segments
-
-    def _process_latents(self, segments: List[torch.Tensor]
-                         ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Encode segments into latents suitable for time-series prediction.
-
-        Parameters
-        ----------
-        segments : List[torch.Tensor]
-            List of input segments,
-            each of shape (batch_size, channels, seq_len).
-
-        Returns
-        -------
-        torch.Tensor
-            Latents prepared for prediction models,
-            shape (batch_size, total_length, latent_dim),
-            where the last axis includes
-            all the means and log variances,
-            and total_length is the length of
-            latents.
-
-        """
-        lf_latents = []
-        hf_latents = []
-        with torch.no_grad():
-            for seg in segments:
-                mu_l, log_var_l, mu_h, log_var_h = self.pretrained_vae.encode(seg)
-                 
-                if self.pretrained_vae.latent_type == 'spatial':
-                    # Reshape latents: (batch_size, h, w, latent_dim)
-                    # -> (batch_size, w, h * latent_dim)
-                    mu_l = rearrange(mu_l, 'b h w d -> b w (h d)')
-                    log_var_l = rearrange(log_var_l, 'b h w d -> b w (h d)')
-                    mu_h = rearrange(mu_h, 'b h w d -> b w (h d)')
-                    log_var_h = rearrange(log_var_h, 'b h w d -> b w (h d)')
-                elif self.pretrained_vae.latent_type == 'time':
-                    # Latents are already in the desired shape
-                    # (batch_size, w, latent_dim)
-                    pass
-                else:
-                    self.logger.log(
-                        f"Unknown latent_type: {self.pretrained_vae.latent_type}",
-                        level='error'
-                    )
-                    raise
-
-                # Concatenate means and log variances along the feature dimension
-                lf_latent_segment = torch.cat([mu_l, log_var_l], dim=-1)
-                hf_latent_segment = torch.cat([mu_h, log_var_h], dim=-1)
-
-                # Collect LF and HF latent segments
-                lf_latents.append(lf_latent_segment)
-                hf_latents.append(hf_latent_segment)
-
-        # Concatenate segments along the temporal dimension
-        lf_latents = torch.cat(lf_latents, dim=1)
-        hf_latents = torch.cat(hf_latents, dim=1)
-        return lf_latents, hf_latents
-
-    def _reconstruct_sequence(self, z_l: torch.Tensor,
-                              z_h: torch.Tensor) -> torch.Tensor:
-        """
-        Decode predicted latents back into the original sequence.
-
-        Parameters
-        ----------
-        z_l, z_h : torch.Tensor
-            Predicted latent representations,
-            shape (batch_size, total_length, latent_dim).
-
-        Returns
-        -------
-        torch.Tensor
-            Reconstructed sequence of shape (batch_size, total_length, channels).
-        """
-        seq_len_l = z_l.shape[1] // self.pred_segments
-        seq_len_h = z_h.shape[1] // self.pred_segments
-        # Split the latents back into segments
-        segments_l = torch.split(z_l, seq_len_l, dim=1)
-        segments_h = torch.split(z_h, seq_len_h, dim=1)
-
-        reconstructed_segments = []
-
-        for seg_l, seg_h in zip(segments_l, segments_h):
-            # Split into low-frequency (LF) and high-frequency (HF) components
-            latent_dim_l = seg_l.size(-1) // 2  # latent dimensions (mu_l, log_var_l)
-            latent_dim_h = seg_h.size(-1) // 2
-            mu_l, log_var_l = seg_l[:, :, :latent_dim_l], seg_l[:, :, latent_dim_l:]
-            mu_h, log_var_h = seg_h[:, :, :latent_dim_h], seg_h[:, :, latent_dim_h:]
-
-            z_l = self.pretrained_vae.reparameterize(mu_l, log_var_l)
-            z_h = self.pretrained_vae.reparameterize(mu_h, log_var_h)
-
-            # Rearrange back to (batch_size, hid_dim, h, w) for decoding
-            d, h = self.pretrained_vae.hid_dim, self.pretrained_vae.h
-            if self.pretrained_vae.latent_type == 'spatial':
-                z_l = rearrange(z_l, 'b w (h d) -> b h w d', h=h, d=d)
-                z_h = rearrange(z_h, 'b w (h d) -> b h w d', h=h, d=d)
-                z_l = self.pretrained_vae.project_l(z_l)
-                z_h = self.pretrained_vae.project_h(z_h)
-                z_l = rearrange(z_l, 'b h w d -> b d h w')
-                z_h = rearrange(z_h, 'b h w d -> b d h w')
-            elif self.pretrained_vae.latent_type == 'time':
-                z_l = self.pretrained_vae.project_l(z_l)
-                z_h = self.pretrained_vae.project_h(z_h)
-                z_l = rearrange(z_l, 'b w (d h) -> b d h w', h=h, d=d)
-                z_h = rearrange(z_h, 'b w (d h) -> b d h w', h=h, d=d)
-
-            reconstructed_segment = self.pretrained_vae.decode(z_l, z_h)
-            reconstructed_segments.append(reconstructed_segment)
-
-        return torch.cat(reconstructed_segments, dim=1)
     
     def _predict_batch(self,
                        batch_x: torch.Tensor,
@@ -265,7 +256,6 @@ class Exp_VAE2D_Pred(Exp_Main):
         x_segments = self._segment_sequence(batch_x, self.args.recon_len)
         x_latents_l, x_latents_h = self._process_latents(x_segments)
 
-        # Train latent prediction
         pred_latents_l = self.model_l(x_latents_l)  # (batch_size, length, channels)
         pred_latents_h = self.model_h(x_latents_h)
 
@@ -332,7 +322,8 @@ class Exp_VAE2D_Pred(Exp_Main):
                     loss_l, loss_h = self._predict_batch(batch_x, batch_y, criterion)
 
                     model_optim_l.zero_grad()
-                    loss_l.backward(retain_graph=True)  # Retain computation graph for HF backprop
+                    # Retain computation graph for HF backprop
+                    loss_l.backward(retain_graph=True)
                     model_optim_l.step()
                     train_loss_l.append(loss_l.item())
 
@@ -364,6 +355,8 @@ class Exp_VAE2D_Pred(Exp_Main):
                     model_optim_l.step()
                     model_optim_h.step()
                     train_loss.append(loss.item())
+
+                    train_bar.set_postfix(average_loss=np.mean(train_loss))
 
                     if (i+1) % log_interval == 0:
                         batch_msg = (
