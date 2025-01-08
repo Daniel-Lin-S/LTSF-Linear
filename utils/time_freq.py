@@ -166,9 +166,9 @@ def time_to_timefreq(x: torch.Tensor, n_fft: int,
         return x
 
 
-def timefreq_to_time(x, n_fft: int, C: int,
+def timefreq_to_time(x: torch.Tensor, n_fft: int, C: int,
                      split_type: str = 'real_imag', 
-                     norm:bool=True):
+                     norm:bool=True) -> torch.Tensor:
     """
     Convert time-frequency domain tensor (STFT representation) back to the time domain.
 
@@ -187,6 +187,11 @@ def timefreq_to_time(x, n_fft: int, C: int,
         - 'none' : complex-valued.
     norm : bool, optional
         Whether to normalize the ISTFT (default: True).
+    
+    Return
+    ------
+    torch.Tensor
+        the restored time domain representation of x.
     """
     # Re-arrange input tensor according to the split type
     if split_type == 'real_imag':
@@ -225,45 +230,84 @@ def timefreq_to_time(x, n_fft: int, C: int,
         return x
     
 
-def zero_pad_high_freq(xf, copy=False):
+def zero_pad_high_freq(xf: torch.Tensor,
+                       copy: bool=False) -> torch.Tensor:
     """
-    xf: (B, C, H, W); H: frequency-axis, W: temporal-axis
+    Fill all frequencies other than mean energy (component 0)
+    with zeroes or copies of the mean energy.
+
+    Parameters
+    ----------
+    xf : torch.Tensor
+        of shape (B, C, H, W);
+        H: frequency-axis, W: temporal-axis
+    copy : bool, optional
+        if true, copy the mean energy (component 0)
+        to other frequency components.
+        Default is False
+    
+    Return
+    ------
+    torch.Tensor
+        the padded time-frequency representation xf
+        of the same shape as xf.
     """
     if not copy:
         xf_l = torch.zeros(xf.shape).to(xf.device)
         xf_l[:, :, 0, :] = xf[:, :, 0, :]  # (b c h w)
     else:
-        # model input: copy the LF component and paste it to the rest of the frequency bands
+        # model input: copy the LF component and 
+        # paste it to the rest of the frequency bands
         xf_l = xf[:, :, [0], :]  # (b c 1 w)
         xf_l = repeat(xf_l, 'b c 1 w -> b c h w', h=xf.shape[2]).float()  # (b c h w)
     return xf_l
 
-def zero_pad_low_freq(xf, copy=False):
+def zero_pad_low_freq(xf: torch.Tensor,
+                       copy: bool=False) -> torch.Tensor:
     """
-    xf: (B, C, H, W); H: frequency-axis, W: temporal-axis
+    Fill the mean energy (component 0)
+    with zeroes or a copy of component 1.
+
+    Parameters
+    ----------
+    xf : torch.Tensor
+        of shape (B, C, H, W);
+        H: frequency-axis, W: temporal-axis
+    copy : bool, optional
+        if true, copy the mean energy (component 0)
+        to other frequency components.
+        Default is False
+    
+    Return
+    ------
+    torch.Tensor
+        the padded time-frequency representation xf,
+        of the same shape as xf.
     """
     if not copy:
         xf_h = torch.zeros(xf.shape).to(xf.device)
         xf_h[:, :, 1:, :] = xf[:, :, 1:, :]
     else:
-        # model input: copy the first HF component, and paste it to the LF band
+        # model input: copy the first HF component,
+        # and paste it to the LF band
         xf_h = xf[:, :, 1:, :]  # (b c h-1 w)
-        xf_h = torch.cat((xf_h[:,:,[0],:], xf_h), dim=2).float()  # (b c h w)
+        xf_h = torch.cat((xf_h[:,:,[0],:], xf_h), dim=2).float()
     return xf_h
 
 
 def stft_lfhf(x: torch.Tensor,
               n_fft: int) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    Apply STFT to a batch of time series and return the
-    LF (mean frequency) and HF components respectively.
+    Apply STFT to a batch of time series and
+    return the LF (mean energy) and HF components (oscillating patterns)
+    respectively.
 
     Parameters
     ----------
     x : torch.Tensor
         of shape (batch_size, channels, length),
         the time series samples
-    n_fft: int
+    n_fft : int
         Size of FFT used for STFT
 
     Returns

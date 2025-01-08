@@ -9,6 +9,7 @@ encoder:
     lf: 16
     hf: 32
     freq: 4  # same freq downsampling for lf and hf components
+    combined: 32  # when lfhf_separation = False
   # number of neighbouring frequencies to be convoluted
   frequency_bandwidth: 3
 
@@ -27,6 +28,7 @@ vae:
   beta_init: 0.
 
 ### for STFT ###
-# number of FFT points
+# number of FFT points (frequency resolution)
 n_fft: 16  # for efficient computation, use power of 2
 stft_split_type: 'real_imag'  # 'real_imag' 'magnitude_phase'
+lfhf_separation: true

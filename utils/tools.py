@@ -70,7 +70,6 @@ def adjust_learning_rate(optimizer: torch.optim.Optimizer,
         lr = lr_adjust[epoch]
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
-        print('Updating learning rate to {}'.format(lr))
 
 
 class EarlyStopping:
@@ -324,7 +323,8 @@ def split_args_two_stages(args: argparse.Namespace):
 def plot_reconstruction_for_channels(
         origin: np.ndarray, recon: np.ndarray,
         channels_to_plot: List[int],
-        save_path: Optional[str]=None):
+        save_path: Optional[str]=None,
+        title: Optional[str]=None):
     """
     Plots the original and reconstructed time-series sequences
     for selected channels, and saves the figure.
@@ -343,6 +343,10 @@ def plot_reconstruction_for_channels(
         If not given, the canvas will be returned,
         but nothing saved. Please use plt.show()
         or plt.savefig() outside in this case.
+    
+    title : str, optional
+        The overall title of the plot.
+        Default is "Reconstruction of the Full Series"
 
     Returns
     -------
@@ -357,7 +361,13 @@ def plot_reconstruction_for_channels(
         len(channels_to_plot), 1,
         figsize=(10, len(channels_to_plot) * 5))
 
-    fig.suptitle('Reconstruction of the Full Series')
+    if title:
+        fig.suptitle(title)
+    else:
+        fig.suptitle('Reconstruction of the Full Series')
+
+    if len(channels_to_plot) == 1:
+        axes = [axes]
 
     for i, channel in enumerate(channels_to_plot):
         # Plot original sequence
@@ -388,3 +398,22 @@ def format_large_int(n: int) -> str:
         return f"{n / 1e3:,.2f}K"
     else:
         return f"{n:,.0f}"
+    
+
+def compute_kl_loss(mu: torch.Tensor,
+                    log_var: torch.Tensor) -> torch.Tensor:
+    """
+    Compute the KL prior loss for VAE model.
+
+    Parameters
+    ----------
+    mu, log_var : torch.Tensor
+        mean and log(variance),
+        the two components of reparameterisation      
+    
+    Return
+    ------
+    torch.Tensor
+        a scalar representing the KL loss.
+    """
+    return -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
