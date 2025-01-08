@@ -1,23 +1,26 @@
 from einops import rearrange
 from data_provider.data_factory import data_provider
 from exp.exp_main import Exp_Main
-from models.VAE2D import VAE2D
+from models.reconstructors import VAE2D
 from utils.tools import visualise_results, EarlyStopping, adjust_learning_rate
+from utils.logger import Logger
 
 import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
-from math import gcd
-import copy
-import time
 
+import copy
+from math import gcd
+from tqdm import tqdm
+import time
 import os
 from typing import List, Tuple, Optional
 
 
 # TODO - now only supports linear prediction models, should add handling of transformers later (including the labeled length)
 # TODO - allow for using different prediction models on LF and HF latents
+# TODO - add support for no LF-HF separation
 
 
 class Exp_VAE2D_Pred(Exp_Main):
@@ -26,7 +29,8 @@ class Exp_VAE2D_Pred(Exp_Main):
     """
     def __init__(self, args, 
                  model_path: str,
-                 vae_config: dict):
+                 vae_config: dict,
+                 logger: Logger):
         """
         Parameters
         ----------
@@ -40,6 +44,7 @@ class Exp_VAE2D_Pred(Exp_Main):
             training the VAE2D modle
         """
         self.args = args
+        self.logger = logger
         assert self.args.loss_level in ['latent', 'origin'], (
             'loss_level must be one of latent and origin'
         )
@@ -53,7 +58,8 @@ class Exp_VAE2D_Pred(Exp_Main):
         model_args_l.seq_len = shape_xl[1]
         model_args_l.pred_len = shape_yl[1]
         model_args_l.enc_in = shape_xl[2]
-        print(f'number of latent channels {model_args_l.enc_in}')
+        self.logger.log(f'number of latent channels {model_args_l.enc_in}',
+                        level='debug')
         self.model_l = self._build_model(model_args_l).to(self.device)
 
         model_args_h = copy.deepcopy(args)
@@ -75,9 +81,13 @@ class Exp_VAE2D_Pred(Exp_Main):
             self.pretrained_vae.load_state_dict(
                 torch.load(model_path))
         except FileNotFoundError:
-            raise FileNotFoundError(
-                'Cannot find VAE checkpoint, please train the VAE model before '
-                'running prediction experiment.')
+            self.logger.log(
+                f'Cannot find VAE checkpoint in {model_path}'
+                ', please train the VAE model before '
+                'running prediction experiment.',
+                level='error'
+            )
+            raise
 
         if self.args.use_multi_gpu and self.args.use_gpu:
             self.pretrained_vae = nn.DataParallel(
@@ -123,9 +133,12 @@ class Exp_VAE2D_Pred(Exp_Main):
             List of segmented tensors.
         """
         if x.shape[1] % seq_len != 0:
-            raise ValueError(
+            self.logger.log(
                 f'temporal length of x, {x.shape[1]} '
-                f'must be divisible by seq_len {seq_len}')
+                f'must be divisible by seq_len {seq_len}',
+                level='error'
+            )
+            raise
         segments = [x[:, i:i+seq_len, :] for i in range(0, x.size(1), seq_len)]
         return segments
 
@@ -169,8 +182,11 @@ class Exp_VAE2D_Pred(Exp_Main):
                     # (batch_size, w, latent_dim)
                     pass
                 else:
-                    raise NotImplementedError(
-                        f"Unknown latent_type: {self.pretrained_vae.latent_type}")
+                    self.logger.log(
+                        f"Unknown latent_type: {self.pretrained_vae.latent_type}",
+                        level='error'
+                    )
+                    raise
 
                 # Concatenate means and log variances along the feature dimension
                 lf_latent_segment = torch.cat([mu_l, log_var_l], dim=-1)
@@ -288,8 +304,9 @@ class Exp_VAE2D_Pred(Exp_Main):
         model_optim_h = optim.Adam(self.model_h.parameters(), lr=self.args.learning_rate)
         criterion = self._get_loss()
         model_labels = ['pred_lf', 'pred_hf']
-        early_stopping = EarlyStopping(patience=self.args.patience,
-                                       verbose=True, model_labels=model_labels)
+        early_stopping = EarlyStopping(
+            patience=self.args.patience,
+            verbose=True, model_labels=model_labels, logger=self.logger)
 
         path = os.path.join(self.args.checkpoints, setting)
         if not os.path.exists(path):
@@ -304,8 +321,11 @@ class Exp_VAE2D_Pred(Exp_Main):
                 train_loss_h = []
             elif self.args.loss_level == 'origin':
                 train_loss = []
-                
-            for i, (batch_x, batch_y, _, _) in enumerate(train_loader):
+            
+            train_bar = tqdm(train_loader,
+                             desc=f"Epoch {epoch+1} [Training]",
+                             leave=False)
+            for i, (batch_x, batch_y, _, _) in enumerate(train_bar):
                 batch_start_time = time.time()
 
                 if self.args.loss_level == 'latent':
@@ -321,12 +341,19 @@ class Exp_VAE2D_Pred(Exp_Main):
                     model_optim_h.step()
                     train_loss_h.append(loss_h.item())
 
+                    avg_loss = np.mean(train_loss_l) + np.mean(train_loss_h)
+                    train_bar.set_postfix(average_loss=avg_loss)
+
                     if (i+1) % log_interval == 0:
-                        print(f"Epoch [{epoch + 1}/{self.args.train_epochs}], "
-                            f"Batch [{i}/{len(train_loader)}], "
+                        batch_msg = (
+                            f"Epoch [{epoch + 1}/{self.args.train_epochs}], "
+                            f"Batch [{i+1}/{len(train_loader)}], "
                             f"Time taken per batch: {time.time()-batch_start_time:.2f}s, "
                             f"Average batch Loss LF: {np.mean(train_loss_l):.4f}, "
-                            f"Average batch Loss HF: {np.mean(train_loss_h):.4f}")
+                            f"Average batch Loss HF: {np.mean(train_loss_h):.4f}"
+                        )
+                        self.logger.log(batch_msg, level='debug')
+                        
                 elif self.args.loss_level == 'origin':
                     loss = self._predict_batch(batch_x, batch_y, criterion)
 
@@ -338,35 +365,40 @@ class Exp_VAE2D_Pred(Exp_Main):
                     model_optim_h.step()
                     train_loss.append(loss.item())
 
-                    if i % log_interval == 0:
-                        print(f"Epoch [{epoch + 1}/{self.args.train_epochs}], "
-                            f"Batch [{i}/{len(train_loader)}], "
+                    if (i+1) % log_interval == 0:
+                        batch_msg = (
+                            f"Epoch [{epoch + 1}/{self.args.train_epochs}], "
+                            f"Batch [{i+1}/{len(train_loader)}], "
                             f"Time taken per batch: {time.time()-batch_start_time:.2f}s, "
-                            f"Average batch Loss: {np.mean(train_loss):.4f}")
+                            f"Average batch Loss: {np.mean(train_loss):.4f}"
+                        )
+                        self.logger.log(batch_msg, level='debug')
+                
 
-            # Validation and epoch logging
+            ### Validation loop with logging ###
             epoch_duration = time.time() - epoch_start_time
             if vali_loader is not None:
                 if self.args.loss_level == 'latent':
                     vali_loss_l, vali_loss_h = self.vali(vali_loader, criterion)
                     vali_loss = vali_loss_l + vali_loss_h
 
-                    print(
+                    epoch_msg = (
                         f"Epoch {epoch + 1}/{self.args.train_epochs}, "
-                        f"Time taken: {epoch_duration:.2f}s, "
                         f"Train Loss LF: {np.mean(train_loss_l):.4f}, "
                         f"Train Loss HF: {np.mean(train_loss_h):.4f}, "
                         f"Val Loss LF: {vali_loss_l:.4f}, "
-                        f"Val Loss HF: {vali_loss_h:.4f}"
+                        f"Val Loss HF: {vali_loss_h:.4f}, "
+                        f"Training Time: {epoch_duration:.2f}s"
                     )
                 elif self.args.loss_level == 'origin':
                     vali_loss = self.vali(vali_loader, criterion)
-                    print(
+                    epoch_msg = (
                         f"Epoch {epoch + 1}/{self.args.train_epochs}, "
                         f"Time taken: {epoch_duration:.2f}s, "
                         f"Train Loss: {np.mean(train_loss):.4f}, "
                         f"Val Loss: {vali_loss:.4f}. "
                     )
+                self.logger.log(epoch_msg)
 
                 early_stopping(vali_loss,
                             [self.model_l, self.model_h], path)
@@ -375,7 +407,8 @@ class Exp_VAE2D_Pred(Exp_Main):
                     mean_loss_l = np.mean(train_loss_l)
                     mean_loss_h = np.mean(train_loss_h)
                     mean_loss = mean_loss_l + mean_loss_h
-                    print(
+                    
+                    epoch_msg = (
                         f"Epoch {epoch + 1}/{self.args.train_epochs}, "
                         f"Time taken: {epoch_duration:.2f}s, "
                         f"Train Loss LF: {mean_loss_l:.4f}, "
@@ -383,26 +416,40 @@ class Exp_VAE2D_Pred(Exp_Main):
                     )
                 elif self.args.loss_level == 'origin':
                     mean_loss = np.mean(train_loss)
-                    print(
+                    epoch_msg = (
                         f"Epoch {epoch + 1}/{self.args.train_epochs}, "
                         f"Time taken: {epoch_duration:.2f}s, "
                         f"Train Loss: {mean_loss:.4f}, "
                     )
+                
+                self.logger.log(epoch_msg)
                 early_stopping(mean_loss,
                             [self.model_l, self.model_h], path)
 
+            ### configure learning rates ###
             adjust_learning_rate(model_optim_l, epoch + 1, self.args)
+            for param_group in model_optim_l.param_groups:
+                lr_message = "Learning Rate of LF model " + \
+                    f"updated to {param_group['lr']}"
+                self.logger.log(lr_message, level='debug')
             adjust_learning_rate(model_optim_h, epoch + 1, self.args)
+            for param_group in model_optim_h.param_groups:
+                lr_message = "Learning Rate of HF model " + \
+                    f"updated to {param_group['lr']}"
+                self.logger.log(lr_message, level='debug')
 
     def vali(self, vali_loader, criterion: callable) -> Tuple[float, float]:
         self.model_l.eval()
         self.model_h.eval()
-        
+
+        vali_bar = tqdm(vali_loader,
+                        desc='[Validating]',
+                        leave=False)
         if self.args.loss_level == 'latent':
             vali_loss_l = []
             vali_loss_h = []
             with torch.no_grad():
-                for _, (batch_x, batch_y, _, _) in enumerate(vali_loader):
+                for _, (batch_x, batch_y, _, _) in enumerate(vali_bar):
                     # Segment, encode, and process latents
                     loss_l, loss_h = self._predict_batch(batch_x, batch_y, criterion)
 
@@ -413,7 +460,7 @@ class Exp_VAE2D_Pred(Exp_Main):
         elif self.args.loss_level == 'origin':
             vali_loss = []
             with torch.no_grad():
-                for _, (batch_x, batch_y, _, _) in enumerate(vali_loader):
+                for _, (batch_x, batch_y, _, _) in enumerate(vali_bar):
                     # Segment, encode, and process latents
                     loss = self._predict_batch(batch_x, batch_y, criterion)
 
@@ -437,11 +484,21 @@ class Exp_VAE2D_Pred(Exp_Main):
         _, test_loader = self._get_data(flag='test')
         
         if test:
-            print('loading checkpoint models')
-            self.model_l.load_state_dict(
-                torch.load(os.path.join('./checkpoints/' + setting, 'pred_lf.pth')))
-            self.model_h.load_state_dict(
-                torch.load(os.path.join('./checkpoints/' + setting, 'pred_hf.pth')))
+            model_path_l = os.path.join('./checkpoints/' + setting, 'pred_lf.pth')
+            model_path_h = os.path.join('./checkpoints/' + setting, 'pred_hf.pth')
+            try:
+                self.model_l.load_state_dict(
+                    torch.load(model_path_l))
+                self.model_h.load_state_dict(
+                    torch.load(model_path_h))
+            except FileNotFoundError:
+                error_msg = (
+                    "Cannot find model checkpoints 'pred_lf.pth' and"
+                    " 'pred_hf.pth'. Please train the models"
+                    ' before testing.'
+                )
+                self.logger.log(error_msg, 'error')
+                raise
 
         preds = []
         trues = []
@@ -453,7 +510,10 @@ class Exp_VAE2D_Pred(Exp_Main):
         self.model_l.eval()
         self.model_h.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, _, _) in enumerate(test_loader):
+            test_bar = tqdm(test_loader,
+                        desc='[Testing]',
+                        leave=False)
+            for i, (batch_x, batch_y, _, _) in enumerate(test_bar):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
 
@@ -475,6 +535,10 @@ class Exp_VAE2D_Pred(Exp_Main):
 
                 if i % 20 == 0:  # Visualise predictions every 20 batches
                     visualise_results(folder_path, i, batch_x, pred, true)
+                    self.logger.log(
+                        f'Prediction figures saved to {folder_path}.',
+                        level='debug'
+                    )
 
         self._save_results(setting, preds, trues, inputx)
 
