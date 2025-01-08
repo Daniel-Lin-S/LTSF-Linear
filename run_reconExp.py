@@ -247,7 +247,7 @@ if args.is_training > 0:
         if os.path.exists(result_path):
             logger.log(
                 "Experiment result found in test_results, skipping...")
-            sys.exit()
+            continue
 
         if args.is_training > 1:
             stage_name = f'{args.model_id} Reconstructor Training_{ii}'

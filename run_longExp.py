@@ -151,7 +151,7 @@ if args.is_training:
         if os.path.exists(result_path):
             logger.log(
                 "Experiment result found in test_results, skipping...")
-            sys.exit()
+            continue
 
         # Training Stage
         exp = Exp_Main(args, logger)
