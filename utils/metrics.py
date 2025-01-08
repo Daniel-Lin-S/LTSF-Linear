@@ -85,14 +85,14 @@ def metric(pred: np.ndarray, true: np.ndarray) -> dict:
     return metrics
 
 def decay_l2_loss(prediction: torch.Tensor,
-                  target: torch.Tensor) -> torch.Tensor:
+                  true: torch.Tensor) -> torch.Tensor:
     """
     Custom L2 loss with signal decay 
     (weight scales as 1/t where t is the time step).
 
     Parameters
     ----------
-    prediction, target : torch.Tensor
+    prediction, true : torch.Tensor
         Predicted values and Ground truth values
         of shape (batch_size, length, channels)
 
@@ -101,7 +101,8 @@ def decay_l2_loss(prediction: torch.Tensor,
     torch.Tensor
         The weighted L2 loss value.
     """
-    mse_loss = torch.nn.MSELoss(reduction='none')
+    mse = torch.nn.MSELoss(reduction='none')
+    mse_loss = mse(prediction, true)
 
     time_steps = torch.arange(1, prediction.size(1) + 1
                               ).to(prediction.device)

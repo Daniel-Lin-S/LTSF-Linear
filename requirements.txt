@@ -1,5 +1,6 @@
 # using python version 3.12.7
 einops
+tqdm
 numpy<2.0
 matplotlib==3.9.2
 pandas==2.2.3
