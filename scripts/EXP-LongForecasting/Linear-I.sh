@@ -11,7 +11,7 @@ for pred_len in 96 192 336 729
 do
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/ \
+  --root_path ./dataset/electricity/ \
   --data_path electricity.csv \
   --model_id Electricity_$seq_len'_'$pred_len \
   --model $model_name \
@@ -25,7 +25,7 @@ python -u run_longExp.py \
 
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/ \
+  --root_path ./dataset/traffic/ \
   --data_path traffic.csv \
   --model_id traffic_$seq_len'_'$pred_len \
   --model $model_name \
@@ -39,7 +39,7 @@ python -u run_longExp.py \
 
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/ \
+  --root_path ./dataset/weather/ \
   --data_path weather.csv \
   --model_id weather_$seq_len'_'$pred_len \
   --model $model_name \
@@ -53,7 +53,7 @@ python -u run_longExp.py \
 
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/ \
+  --root_path ./dataset/exchange_rate/ \
   --data_path exchange_rate.csv \
   --model_id Exchange_$seq_len'_'$pred_len \
   --model $model_name \
@@ -67,7 +67,7 @@ python -u run_longExp.py \
 
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/ \
+  --root_path ./dataset/ETT-small/ \
   --data_path ETTh1.csv \
   --model_id ETTh1_$seq_len'_'$pred_len \
   --model $model_name \
@@ -82,7 +82,7 @@ python -u run_longExp.py \
 # if pred_len=336, lr=0.001; if pred_len=720, lr=0.0001
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/ \
+  --root_path ./dataset/ETT-small/ \
   --data_path ETTh2.csv \
   --model_id ETTh2_$seq_len'_'$pred_len \
   --model $model_name \
@@ -97,7 +97,7 @@ python -u run_longExp.py \
 # if pred_len=336, lr=0.005; if pred_len=720, lr=0.0005
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/ \
+  --root_path ./dataset/ETT-small/ \
   --data_path ETTm1.csv \
   --model_id ETTm1_$seq_len'_'$pred_len \
   --model $model_name \
@@ -111,7 +111,7 @@ python -u run_longExp.py \
 
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/ \
+  --root_path ./dataset/ETT-small/ \
   --data_path ETTm2.csv \
   --model_id ETTm2_$seq_len'_'$pred_len \
   --model $model_name \
@@ -129,7 +129,7 @@ for pred_len in 24 36 48 60
 do
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/ \
+  --root_path ./dataset/illness/ \
   --data_path national_illness.csv \
   --model_id national_illness_$seq_len'_'$pred_len \
   --model $model_name \
