@@ -7,7 +7,8 @@ import os
 from utils.tools import load_yaml_param_settings, split_args_two_stages
 from utils.logger import DualLogger
 from exp.exp_recon import Exp_Recon
-from exp.exp_vae_pred import Exp_VAE2D_Pred
+from exp.exp_pred_vae import Exp_VAE2D_Pred
+from exp.exp_pred_ae import Exp_AE2D_Pred
 
 
 ### Set global seed for reproducibility ###
@@ -25,7 +26,7 @@ parser.add_argument('--is_training', type=int, required=True, help='0 : no train
                     'and prediction model; 3 - train reconstruction only')
 parser.add_argument('--model_id', type=str, required=True, help='model id')
 parser.add_argument('--model_recon', type=str, required=True,
-                    help='name of reconstruction model, options: [VAE, VQVAE]')
+                    help='name of reconstruction model, options: [VAE, AE]')
 parser.add_argument('--model_pred', type=str, required=True,
                     help='name of prediction model, options: '
                     '[Autoformer, Informer, Transformer, DLinear, Linear, NLinear]')
@@ -204,6 +205,25 @@ if args.model_recon == 'VAE':
         config['stft_split_type'],
         config['lfhf_separation']
     )
+elif args.model_recon == 'AE':
+    Exp_pred = Exp_AE2D_Pred
+
+    if config['encoder']['downsampling'] == 'time':
+        width_l = config['encoder']['downsampled_width']['lf']
+        width_h = config['encoder']['downsampled_width']['hf']
+        latent_width = f'lf{width_l}_hf{width_h}'
+    elif config['encoder']['downsampling'] == 'freq':
+        latent_width = config['encoder']['downsampled_width']['freq']
+    
+    model_setting = 'hd{}_fb{}_lw{}_nfft{}_split[{}]_sep[{}]'.format(
+        config['encoder']['hid_dim'],
+        config['encoder']['frequency_bandwidth'],
+        latent_width,
+        config['n_fft'],
+        config['stft_split_type'],
+        config['lfhf_separation']
+    )
+
 elif args.model_recon == 'VQVAE':
     raise NotImplementedError
 else:

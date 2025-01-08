@@ -15,7 +15,7 @@ from utils.tools import (
     EarlyStopping, adjust_learning_rate, plot_reconstruction_for_channels
 )
 from utils.logger import Logger
-from models.reconstructors import VAE2D
+from models.reconstructors import VAE2D, AE2D
 from exp.exp_basic import Exp_Basic
 
 
@@ -83,7 +83,8 @@ class Exp_Recon(Exp_Basic):
         model-specific arguments.
         """
         model_dict = {
-            'VAE' : VAE2D
+            'VAE' : VAE2D,
+            'AE' : AE2D
         }
 
         args = self.args

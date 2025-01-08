@@ -30,3 +30,4 @@ vae:
 # number of FFT points
 n_fft: 16  # for efficient computation, use power of 2
 stft_split_type: 'real_imag'  # 'real_imag' 'magnitude_phase'
+lfhf_separation: true
