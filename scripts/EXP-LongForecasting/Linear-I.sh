@@ -7,6 +7,7 @@ if [ ! -d "./logs/LongForecasting" ]; then
 fi
 seq_len=336
 model_name=NLinear
+repeat=3
 for pred_len in 96 192 336 729
 do
 python -u run_longExp.py \
@@ -21,7 +22,7 @@ python -u run_longExp.py \
   --pred_len $pred_len \
   --enc_in 321 \
   --des 'Exp' \
-  --itr 1 --batch_size 16  --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'electricity_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 16  --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'electricity_$seq_len'_'$pred_len.log 
 
 python -u run_longExp.py \
   --is_training 1 \
@@ -35,7 +36,7 @@ python -u run_longExp.py \
   --pred_len $pred_len \
   --enc_in 862 \
   --des 'Exp' \
-  --itr 1 --batch_size 16 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'traffic_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 16 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'traffic_$seq_len'_'$pred_len.log 
 
 python -u run_longExp.py \
   --is_training 1 \
@@ -49,7 +50,7 @@ python -u run_longExp.py \
   --pred_len $pred_len \
   --enc_in 21 \
   --des 'Exp' \
-  --itr 1 --batch_size 16 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'weather_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 16 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'weather_$seq_len'_'$pred_len.log 
 
 python -u run_longExp.py \
   --is_training 1 \
@@ -63,7 +64,7 @@ python -u run_longExp.py \
   --pred_len $pred_len \
   --enc_in 8 \
   --des 'Exp' \
-  --itr 1 --batch_size 8 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'exchange_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 8 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'exchange_$seq_len'_'$pred_len.log 
 
 python -u run_longExp.py \
   --is_training 1 \
@@ -77,7 +78,7 @@ python -u run_longExp.py \
   --pred_len $pred_len \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 1 --batch_size 32 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'ETTh1_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 32 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'ETTh1_$seq_len'_'$pred_len.log 
 
 # if pred_len=336, lr=0.001; if pred_len=720, lr=0.0001
 python -u run_longExp.py \
@@ -92,7 +93,7 @@ python -u run_longExp.py \
   --pred_len $pred_len \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 1 --batch_size 32 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'ETTh2_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 32 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'ETTh2_$seq_len'_'$pred_len.log 
 
 # if pred_len=336, lr=0.005; if pred_len=720, lr=0.0005
 python -u run_longExp.py \
@@ -107,7 +108,7 @@ python -u run_longExp.py \
   --pred_len $pred_len \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 1 --batch_size 8 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'ETTm1_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 8 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'ETTm1_$seq_len'_'$pred_len.log 
 
 python -u run_longExp.py \
   --is_training 1 \
@@ -121,7 +122,7 @@ python -u run_longExp.py \
   --pred_len $pred_len \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 1 --batch_size 32 --learning_rate 0.01 --individual >logs/LongForecasting/$model_name'_I_'ETTm2_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 32 --learning_rate 0.01 --individual >logs/LongForecasting/$model_name'_I_'ETTm2_$seq_len'_'$pred_len.log 
 done
 
 seq_len=104
@@ -140,6 +141,6 @@ python -u run_longExp.py \
   --pred_len $pred_len \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 1 --batch_size 32 --learning_rate 0.01 --individual >logs/LongForecasting/$model_name'_I_'ILI_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 32 --learning_rate 0.01 --individual >logs/LongForecasting/$model_name'_I_'ILI_$seq_len'_'$pred_len.log 
 done
 

@@ -8,6 +8,7 @@ fi
 seq_len=336
 model_recon=VAE
 model_pred=NLinear
+repeat=3
 for pred_len in 96 192 336 729
 do
 python -u run_reconExp.py \
@@ -23,7 +24,7 @@ python -u run_reconExp.py \
   --pred_len $pred_len \
   --enc_in 321 \
   --des 'Exp' \
-  --itr 3 \
+  --itr $repeat \
   --batch_size_recon 8 \
   --batch_size_pred 16 \
   --learning_rate_recon 0.001 \
@@ -43,7 +44,7 @@ python -u run_reconExp.py \
   --pred_len $pred_len \
   --enc_in 862 \
   --des 'Exp' \
-  --itr 3 \
+  --itr $repeat \
   --batch_size_recon 8 \
   --batch_size_pred 16 \
   --learning_rate_recon 0.001 \
@@ -63,7 +64,7 @@ python -u run_reconExp.py \
   --pred_len $pred_len \
   --enc_in 21 \
   --des 'Exp' \
-  --itr 3 \
+  --itr $repeat \
   --batch_size_recon 8 \
   --batch_size_pred 16 \
   --learning_rate_recon 0.001 \
@@ -83,7 +84,7 @@ python -u run_reconExp.py \
   --pred_len $pred_len \
   --enc_in 8 \
   --des 'Exp' \
-  --itr 3 \
+  --itr $repeat \
   --batch_size_recon 8 \
   --batch_size_pred 8 \
   --learning_rate_recon 0.001 \
@@ -103,7 +104,7 @@ python -u run_reconExp.py \
   --pred_len $pred_len \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 3 \
+  --itr $repeat \
   --batch_size_recon 16 \
   --batch_size_pred 32 \
   --learning_rate_recon 0.001 \
@@ -123,7 +124,7 @@ python -u run_reconExp.py \
   --pred_len $pred_len \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 3 \
+  --itr $repeat \
   --batch_size_recon 16 \
   --batch_size_pred 32 \
   --learning_rate_recon 0.001 \
@@ -143,7 +144,7 @@ python -u run_reconExp.py \
   --pred_len $pred_len \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 3 \
+  --itr $repeat \
   --batch_size_recon 16 \
   --batch_size_pred 32 \
   --learning_rate_recon 0.001 \
@@ -163,7 +164,7 @@ python -u run_reconExp.py \
   --pred_len $pred_len \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 3 \
+  --itr $repeat \
   --batch_size_recon 16 \
   --batch_size_pred 32 \
   --learning_rate_recon 0.002 \
@@ -188,7 +189,7 @@ python -u run_reconExp.py \
   --label_len 18 \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 3 \
+  --itr $repeat \
   --batch_size_recon 16 \
   --batch_size_pred 32 \
   --learning_rate_recon 0.002 \
