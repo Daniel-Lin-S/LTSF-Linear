@@ -3,6 +3,8 @@ import torch
 from exp.exp_main import Exp_Main
 import random
 import numpy as np
+import os
+import sys
 from utils.logger import DualLogger
 
 
@@ -144,18 +146,28 @@ if args.is_training:
 
         setting = f'{base_setting}_{ii}'
 
+        # skip if already tested
+        result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
+        if os.path.exists(result_path):
+            logger.log(
+                "Experiment result found in test_results, skipping...")
+            sys.exit()
+
+        # Training Stage
         exp = Exp_Main(args, logger)
         stage_name = f'{args.model_id} Predictor Training_{ii}'
         logger.start_stage(stage_name, setting)
         exp.train(setting)
         logger.finish_stage(stage_name)
 
+        # Testing Stage
         if not args.train_only:
             stage_name = f'{args.model_id} Testing_{ii}'
             logger.start_stage(stage_name, setting)
             exp.test(setting)
             logger.finish_stage(stage_name)
 
+        # Prediction Stage
         if args.do_predict:
             stage_name = f'{args.model_id} Prediction_{ii}'
             logger.start_stage(stage_name, setting)
@@ -165,14 +177,22 @@ if args.is_training:
         torch.cuda.empty_cache()
 else:
     setting = f'{base_setting}_{args.test_idx}'
+
+    # skip if already tested
+    result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
+    if os.path.exists(result_path):
+        logger.log(
+            "Experiment result found in test_results, skipping...")
+        sys.exit()
+
     exp = Exp_Main(args, logger)
 
-    if args.do_predict:
+    if args.do_predict:  # Prediction Stage
         stage_name = f'{args.model_id} Prediction'
         logger.start_stage(stage_name, setting)
         exp.predict(base_setting, True)
         logger.finish_stage(stage_name)
-    else:
+    else:  # Test Stage
         stage_name = f'{args.model_id} Testing'
         logger.start_stage(stage_name, setting)
         exp.test(base_setting, test=1)

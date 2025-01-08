@@ -24,7 +24,10 @@ from abc import ABC, abstractmethod
 
 class Exp_Latent_Pred(Exp_Main, ABC):
     """
-    Base Experiment class for latent prediction.
+    Base Experiment class for latent prediction. \n
+    All subclasses must define _process_latents and
+    _reconstruct_sequence according to the
+    features of the specific reconstruction model.
 
     Notes
     -----

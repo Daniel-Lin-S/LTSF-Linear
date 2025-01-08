@@ -3,6 +3,7 @@ import torch
 import random
 import numpy as np
 import os
+import sys
 
 from utils.tools import load_yaml_param_settings, split_args_two_stages
 from utils.logger import DualLogger
@@ -241,6 +242,13 @@ if args.is_training > 0:
         # add experiment id
         setting = f'{base_setting}_{model_setting}_{args.des}_{ii}'
 
+        # skip if already tested
+        result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
+        if os.path.exists(result_path):
+            logger.log(
+                "Experiment result found in test_results, skipping...")
+            sys.exit()
+
         if args.is_training > 1:
             stage_name = f'{args.model_id} Reconstructor Training_{ii}'
             exp_recon = Exp_Recon(args_recon, config, logger)
@@ -267,6 +275,14 @@ if args.is_training > 0:
         torch.cuda.empty_cache()
 else:
     setting = f'{base_setting}_{model_setting}_{args.des}_{args.test_idx}'
+
+    # skip if already tested
+    result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
+    if os.path.exists(result_path):
+        logger.log(
+            "Experiment result found in test_results, skipping...")
+        sys.exit()
+
     # path to the reconstruction model
     model_path = os.path.join(
         args.checkpoints, setting, 'reconstructor.pth')
