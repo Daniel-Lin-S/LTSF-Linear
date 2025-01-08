@@ -321,7 +321,7 @@ class Exp_Main(Exp_Basic):
                     loss.backward()
                     model_optim.step()
 
-            epoch_msg = "Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time)
+            epoch_msg = "Epoch: {0} cost time: {1:.4f}s".format(epoch + 1, time.time() - epoch_time)
             if self.logger:
                 self.logger.log(epoch_msg)
             else:
