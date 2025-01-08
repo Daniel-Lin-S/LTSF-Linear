@@ -276,7 +276,7 @@ class Exp_Main(Exp_Basic):
             epoch_time = time.time()
 
             train_bar = tqdm(train_loader,
-                             desc=f"Epoch {epoch} [Training]",
+                             desc=f"Epoch {epoch+1} [Training]",
                              leave=False)
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark
                     ) in enumerate(train_bar):

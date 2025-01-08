@@ -208,7 +208,7 @@ class Exp_Recon(Exp_Basic):
 
             # build progress bar
             train_bar = tqdm(train_loader,
-                             desc=f"Epoch {epoch} [Training]",
+                             desc=f"Epoch {epoch+1} [Training]",
                              leave=False)
             for i, (batch_x, _) in enumerate(train_bar):
                 batch_x = batch_x.float().to(self.device)
@@ -323,12 +323,12 @@ class Exp_Recon(Exp_Basic):
         model_params = signature(self.model.forward).parameters
         save_recon_possible = 'save_recon' in model_params and (
             'folder_path' in model_params)
-        if save_recon and not save_recon_possible:
-            save_recon = False
+        if plot_recon and not save_recon_possible:
+            plot_recon = False
 
         with torch.no_grad():
             vali_bar = tqdm(vali_loader,
-                            desc=f"Epoch {epoch_id} [Validation]",
+                            desc=f"Epoch {epoch_id+1} [Validation]",
                             leave=False)
             for i, (batch_x, _) in enumerate(vali_bar):
                 batch_x = batch_x.float().to(self.device)
