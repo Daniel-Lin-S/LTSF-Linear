@@ -1,15 +1,19 @@
 import argparse
-import os
 import torch
 from exp.exp_main import Exp_Main
 import random
 import numpy as np
+from utils.logger import DualLogger
 
-fix_seed = 2021
+
+### Set Global seed for reproducibility ###
+fix_seed = 2025
 random.seed(fix_seed)
 torch.manual_seed(fix_seed)
 np.random.seed(fix_seed)
 
+
+### Collect Arguments ###
 parser = argparse.ArgumentParser(description='Autoformer & Transformer family for Time Series Forecasting')
 
 # basic config
@@ -19,8 +23,14 @@ parser.add_argument('--train_only', type=bool, required=False, default=False,
 parser.add_argument('--model_id', type=str, required=True, help='model id')
 parser.add_argument('--model', type=str, required=True,
                     help='model name, options: [Autoformer, Informer, Transformer, DLinear, Linear, NLinear]')
+parser.add_argument('--itr', type=int, default=2, help='number of experiment repetitions')
+parser.add_argument('--test_idx', type=int, default=0,
+                    help='index of the experiment repetition used for testing'
+                    ' if is_training = 0')
 parser.add_argument('--des', type=str, default='',
                     help='experiment description added at the end of folder name')
+parser.add_argument('--log_file', type=str, default='logs/test.log',
+                    help='file path of log file for the training process')
 
 # data loader
 parser.add_argument('--data', type=str, required=True, help='dataset type')
@@ -40,7 +50,6 @@ parser.add_argument('--pred_len', type=int, default=96, help='prediction sequenc
 parser.add_argument('--hop_length', type=int, default=1,
                     help='hop length for the sliding window of getting dataset '
                     'of the prediction model')
-
 
 # DLinear
 parser.add_argument('--individual', action='store_true', default=False, help='DLinear: a linear layer for each variate(channel) individually')
@@ -68,7 +77,6 @@ parser.add_argument('--do_predict', action='store_true', help='whether to predic
 
 # optimization
 parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
-parser.add_argument('--itr', type=int, default=2, help='number of experiment repetitions')
 parser.add_argument('--train_epochs', type=int, default=10, help='train epochs')
 parser.add_argument('--batch_size', type=int, default=32, help='batch size of train input data')
 parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
@@ -86,7 +94,18 @@ parser.add_argument('--test_flop', action='store_true', default=False, help='See
 
 args = parser.parse_args()
 
-args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
+### Prepare Logger ###
+logger = DualLogger(args.log_file)
+
+logger.start_experiment(args.model_id, args.is_training)
+logger.log(f'Experiment settings: \n {args}', level='debug')
+
+### Set up GPU devices ###
+if not torch.cuda.is_available() and args.use_gpu:
+    logger.log('use_gpu = True but GPU not available, '
+               'deviced changed to cpu',
+               level='warning')
+    args.use_gpu = False
 
 if args.use_gpu and args.use_multi_gpu:
     args.dvices = args.devices.replace(' ', '')
@@ -94,10 +113,9 @@ if args.use_gpu and args.use_multi_gpu:
     args.device_ids = [int(id_) for id_ in device_ids]
     args.gpu = args.device_ids[0]
 
-print('Args in experiment:')
-print(args)
-
-Exp = Exp_Main
+### Set seeds for iterations ###
+iteration_seeds = [random.randint(0, 2**32 - 1) for _ in range(args.itr)]
+logger.log(f'Random seeds for experiments: {iteration_seeds}', level='debug')
 
 base_setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}'.format(
     args.model_id,
@@ -119,30 +137,44 @@ base_setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_
 )
 
 if args.is_training:
-    for ii in range(args.itr):
-        # add experiment id
+    for ii, seed in enumerate(iteration_seeds):
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+
         setting = f'{base_setting}_{ii}'
 
-        exp = Exp(args)  # set experiments
-        print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
+        exp = Exp_Main(args, logger)
+        stage_name = f'{args.model_id} Predictor Training_{ii}'
+        logger.start_stage(stage_name, setting)
         exp.train(setting)
+        logger.finish_stage(stage_name)
 
         if not args.train_only:
-            print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+            stage_name = f'{args.model_id} Testing_{ii}'
+            logger.start_stage(stage_name, setting)
             exp.test(setting)
+            logger.finish_stage(stage_name)
 
         if args.do_predict:
-            print('>>>>>>>predicting : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+            stage_name = f'{args.model_id} Prediction_{ii}'
+            logger.start_stage(stage_name, setting)
             exp.predict(setting, True)
+            logger.finish_stage(stage_name)
 
         torch.cuda.empty_cache()
 else:
-    exp = Exp(args)  # set experiments
+    setting = f'{base_setting}_{args.test_idx}'
+    exp = Exp_Main(args, logger)
 
     if args.do_predict:
-        print('>>>>>>>predicting : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(base_setting))
+        stage_name = f'{args.model_id} Prediction'
+        logger.start_stage(stage_name, setting)
         exp.predict(base_setting, True)
+        logger.finish_stage(stage_name)
     else:
-        print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(base_setting))
+        stage_name = f'{args.model_id} Testing'
+        logger.start_stage(stage_name, setting)
         exp.test(base_setting, test=1)
+        logger.finish_stage(stage_name)
     torch.cuda.empty_cache()

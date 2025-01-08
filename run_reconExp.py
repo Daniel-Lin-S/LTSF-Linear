@@ -3,19 +3,21 @@ import torch
 import random
 import numpy as np
 import os
-from copy import deepcopy
 
 from utils.tools import load_yaml_param_settings, split_args_two_stages
-from exp.exp_vae2d import Exp_VAE2D
+from utils.logger import DualLogger
+from exp.exp_recon import Exp_Recon
 from exp.exp_vae_pred import Exp_VAE2D_Pred
 
 
-fix_seed = 2021
+### Set global seed for reproducibility ###
+fix_seed = 2025
 random.seed(fix_seed)
 torch.manual_seed(fix_seed)
 np.random.seed(fix_seed)
 
-parser = argparse.ArgumentParser(description='First stage reconstruction')
+### Collect Arguments ###
+parser = argparse.ArgumentParser(description='Two-stage Prediction')
 
 # basic config
 parser.add_argument('--is_training', type=int, required=True, help='0 : no training,'
@@ -29,8 +31,14 @@ parser.add_argument('--model_pred', type=str, required=True,
                     '[Autoformer, Informer, Transformer, DLinear, Linear, NLinear]')
 parser.add_argument('--train_only', type=bool, required=False, default=False,
                     help='perform training on full input dataset without validation and testing')
+parser.add_argument('--itr', type=int, default=2, help='number of experiment repetitions')
+parser.add_argument('--test_idx', type=int, default=0,
+                    help='index of the experiment repetition used for testing'
+                    ' if is_training = 0')
 parser.add_argument('--des', type=str, default='',
                     help='experiment description added at the end of folder name')
+parser.add_argument('--log_file', type=str, default='logs/test.log',
+                    help='file path of log file for the training process')
 
 # data loader
 parser.add_argument('--data', type=str, required=True,
@@ -95,7 +103,6 @@ parser.add_argument('--config', type=str, default='configs/config_vae.yaml',
 
 # optimization and training
 parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
-parser.add_argument('--itr', type=int, default=2, help='number of experiment repetitions')
 parser.add_argument('--train_epochs_recon', type=int, default=10,
                     help='number of epochs for training reconstruction model')
 parser.add_argument('--train_epochs_pred', type=int, default=5,
@@ -122,7 +129,7 @@ parser.add_argument('--use_amp', action='store_true',
 
 # GPU
 parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
-parser.add_argument('--gpu', type=int, default=0, help='gpu')
+parser.add_argument('--gpu', type=int, default=0, help='gpu device id.')
 parser.add_argument('--use_multi_gpu', action='store_true',
                     help='use multiple gpus', default=False)
 parser.add_argument('--devices', type=str, default='0,1,2,3',
@@ -130,7 +137,22 @@ parser.add_argument('--devices', type=str, default='0,1,2,3',
 
 args = parser.parse_args()
 
-args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
+### Prepare Logger ###
+logger = DualLogger(args.log_file)
+
+logger.start_experiment(args.model_id, args.is_training)
+logger.log(f'Experiment settings: \n {args}', level='debug')
+
+### Set seeds for iterations ###
+iteration_seeds = [random.randint(0, 2**32 - 1) for _ in range(args.itr)]
+logger.log(f'Random seeds for experiments: {iteration_seeds}', level='debug')
+
+### Set up GPU devices ###
+if not torch.cuda.is_available() and args.use_gpu:
+    logger.log('use_gpu = True but GPU not available, '
+               'deviced changed to cpu',
+               level='warning')
+    args.use_gpu = False
 
 if args.use_gpu and args.use_multi_gpu:
     args.dvices = args.devices.replace(' ', '')
@@ -138,10 +160,8 @@ if args.use_gpu and args.use_multi_gpu:
     args.device_ids = [int(id_) for id_ in device_ids]
     args.gpu = args.device_ids[0]
 
-print('Args in experiment:')
-print(args)
-
-base_setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_loss[{}_{}]_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_{}'.format(
+### Prepare basic and model settings ###
+base_setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_loss[{}_{}]_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}'.format(
     args.model_id,
     args.model_recon,
     args.model_pred,
@@ -157,14 +177,12 @@ base_setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_loss[{}_{}]_dm{}_nh{}_el{}_dl{}_df{
     args.d_layers,
     args.d_ff,
     args.factor,
-    args.embed,
-    args.des
+    args.embed
 )
 
 config = load_yaml_param_settings(args.config)
 
 if args.model_recon == 'VAE':
-    Exp_recon = Exp_VAE2D
     Exp_pred = Exp_VAE2D_Pred
 
     if config['encoder']['downsampling'] == 'time':
@@ -174,7 +192,7 @@ if args.model_recon == 'VAE':
     elif config['encoder']['downsampling'] == 'freq':
         latent_width = config['encoder']['downsampled_width']['freq']
 
-    model_setting = 'hd{}_fb{}_lw{}_ld{}_lt[{}]_beta{}->{}_nfft{}_split[{}]'.format(
+    model_setting = 'hd{}_fb{}_lw{}_ld{}_lt[{}]_beta{}->{}_nfft{}_split[{}]_sep[{}]'.format(
         config['encoder']['hid_dim'],
         config['encoder']['frequency_bandwidth'],
         latent_width,
@@ -183,44 +201,60 @@ if args.model_recon == 'VAE':
         config['vae']['beta_init'],
         config['vae']['beta'],
         config['n_fft'],
-        config['stft_split_type']
+        config['stft_split_type'],
+        config['lfhf_separation']
     )
 elif args.model_recon == 'VQVAE':
     raise NotImplementedError
 else:
     raise NotImplementedError
 
+### Two-stage Training and Testing ###
 args_recon, args_pred = split_args_two_stages(args)
 
 if args.is_training > 0:
-    for ii in range(args.itr):
+    for ii, seed in enumerate(iteration_seeds):
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+
         # add experiment id
-        setting = f'{base_setting}_{model_setting}_{ii}'
+        setting = f'{base_setting}_{model_setting}_{args.des}_{ii}'
 
         if args.is_training > 1:
-            exp_recon = Exp_recon(args_recon, config)
-            print('>>>>>>>start training Reconstructor : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
+            stage_name = f'{args.model_id} Reconstructor Training_{ii}'
+            exp_recon = Exp_Recon(args_recon, config, logger)
+            logger.start_stage(stage_name, setting)
             exp_recon.train(setting)
+            logger.finish_stage(stage_name)
 
         model_path = os.path.join(
-            args.checkpoints, setting, 'checkpoint.pth')
+            args.checkpoints, setting, 'reconstructor.pth')
         
         if args.is_training < 3:
-            print('>>>>>>>start training Predictor on latents >>>>>>>>>>>>>>>>>>>>>>>>>>')
-            exp_pred = Exp_pred(args_pred, model_path, config)
+            stage_name = f'{args.model_id} Latent Predictor Training_{ii}'
+            logger.start_stage(stage_name, setting)
+            exp_pred = Exp_pred(args_pred, model_path, config, logger)
             exp_pred.train(setting)
+            logger.finish_stage(stage_name)
 
             if not args.train_only:
-                print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+                stage_name = f'{args.model_id} Latent Predictor Testing_{ii}'
+                logger.start_stage(stage_name, setting)
                 exp_pred.test(setting)
+                logger.finish_stage(stage_name)
 
         torch.cuda.empty_cache()
 else:
-    setting = f'{base_setting}_{model_setting}_0'
+    setting = f'{base_setting}_{model_setting}_{args.des}_{args.test_idx}'
+    # path to the reconstruction model
     model_path = os.path.join(
-            args.checkpoints, setting, 'checkpoint.pth')
-    exp_pred = Exp_pred(args_pred, model_path, config)
+        args.checkpoints, setting, 'reconstructor.pth')
+    exp_pred = Exp_pred(args_pred, model_path, config, logger)
 
-    print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+    stage_name = f'{args.model_id} Latent Predictor Testing'
+    logger.start_stage(stage_name, setting)
     exp_pred.test(setting, test=1)
+    logger.finish_stage(stage_name)
+
     torch.cuda.empty_cache()

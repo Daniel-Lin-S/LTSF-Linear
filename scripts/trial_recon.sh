@@ -4,26 +4,28 @@ if [ ! -d "./logs" ]; then
 fi
 
 python -u run_reconExp.py \
-  --is_training 1 \
-  --root_path ./dataset/exchange_rate \
-  --data_path exchange_rate.csv \
-  --model_id trial \
+  --is_training 3 \
+  --root_path ./dataset/ETT-small/ \
+  --data_path ETTh1.csv \
+  --model_id ETTh1_336_96 \
   --model_recon VAE \
   --model_pred DLinear \
-  --data custom \
+  --des 'Trial' \
+  --data ETTh1 \
   --features M \
   --seq_len 336 \
   --pred_len 96 \
-  --enc_in 8 \
+  --enc_in 7 \
   --loss_level origin \
   --itr 1 \
   --train_epochs_recon 20 \
   --train_epochs_pred 5 \
   --patience_recon 5 \
   --patience_pred 3 \
-  --batch_size_recon 8  \
-  --batch_size_pred 16  \
+  --batch_size_recon 16  \
+  --batch_size_pred 32  \
   --learning_rate_recon 0.001 \
   --learning_rate_pred 0.005 \
   --num_workers 0 \
-  --individual >logs/trial_recon_0beta_pred.log
+  --individual \
+  --log_file logs/trial_recon_0beta_recon.log
