@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 from torch import optim
 
-from typing import Optional
+from typing import Optional, Tuple
 from tqdm import tqdm
 import os
 import time
@@ -143,7 +143,9 @@ class Exp_Main(Exp_Basic):
                 f"{', '.join(available_losses)}."
             )
 
-    def _extract_prediction(self, batch_y, outputs):
+    def _extract_prediction(
+            self, batch_y, outputs
+        ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Slice out the prediction horizon and the
         variable (channel) for evaluation if necessary.
@@ -511,6 +513,7 @@ class Exp_Main(Exp_Basic):
             metrics['mse'], metrics['mae'], metrics['rse'], metrics['corr']))
         f.write('\n')
         f.write('\n')
+        self.logger.log('metrics saved to result.txt', level='debug')
 
         if save_all:
             folder_path = './results/' + setting + '/'

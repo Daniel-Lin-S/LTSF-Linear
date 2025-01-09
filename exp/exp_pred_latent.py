@@ -279,7 +279,7 @@ class Exp_Latent_Pred(Exp_Main, ABC):
                 loss = criterion(true_seq, pred_seq)
                 return loss
         else:
-            return pred_latents_l, pred_latents_h
+            return x_latents_l, x_latents_h, pred_latents_l, pred_latents_h
 
     def _get_data(self, flag: str):
         """
@@ -421,6 +421,10 @@ class Exp_Latent_Pred(Exp_Main, ABC):
                 self.logger.log(epoch_msg)
                 early_stopping(mean_loss,
                             [self.model_l, self.model_h], path)
+            
+            if early_stopping.early_stop:
+                self.logger.log("Early stopping...")
+                break
 
             ### configure learning rates ###
             adjust_learning_rate(model_optim_l, epoch + 1, self.args)
@@ -500,8 +504,11 @@ class Exp_Latent_Pred(Exp_Main, ABC):
         trues = []
         inputx = []
         folder_path = './test_results/' + setting + '/'
+        latent_folder_path = f'{folder_path}/latents/'
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
+        if not os.path.exists(latent_folder_path):
+            os.makedirs(latent_folder_path)
 
         self.model_l.eval()
         self.model_h.eval()
@@ -513,12 +520,19 @@ class Exp_Latent_Pred(Exp_Main, ABC):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
 
-                pred_latents_l, pred_latents_h = self._predict_batch(
+                x_lat_l, x_lat_h, pred_lat_l, pred_lat_h = self._predict_batch(
                     batch_x, calculate_loss=False
                 )
 
+                y_segments = self._segment_sequence(batch_y, self.args.recon_len)
+                y_lat_l, y_lat_h = self._process_latents(y_segments)
+                y_lat_l = y_lat_l[:, -pred_lat_l.shape[1]:, :]
+                y_lat_h = y_lat_h[:, -pred_lat_h.shape[1]:, :]
+                y_lat_l = y_lat_l.detach().cpu().numpy()
+                y_lat_h = y_lat_h.detach().cpu().numpy()
+
                 pred_seq = self._reconstruct_sequence(
-                    pred_latents_l, pred_latents_h)
+                    pred_lat_l, pred_lat_h)
                 
                 true_seq, pred_seq = self._extract_prediction(batch_y, pred_seq)
 
@@ -531,10 +545,21 @@ class Exp_Latent_Pred(Exp_Main, ABC):
 
                 if i % 20 == 0:  # Visualise predictions every 20 batches
                     visualise_results(folder_path, i, batch_x, pred, true)
-                    self.logger.log(
-                        f'Prediction figures saved to {folder_path}.',
-                        level='debug'
-                    )
+                    visualise_results(
+                        latent_folder_path,
+                        i, x_lat_l, pred_lat_l, y_lat_l,
+                        file_name='pred_latent_l_' + str(i) + '.pdf'
+                        )
+                    visualise_results(
+                        latent_folder_path,
+                        i, x_lat_h, pred_lat_h, y_lat_h,
+                        file_name='pred_latent_h_' + str(i) + '.pdf'
+                        )
+
+        self.logger.log(
+            f'Prediction figures saved to {folder_path}.',
+            level='debug'
+        )
 
         self._save_results(setting, preds, trues, inputx)
 

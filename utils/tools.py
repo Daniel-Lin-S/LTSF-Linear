@@ -212,7 +212,8 @@ def visual(true: np.ndarray, preds: Optional[np.ndarray]=None,
 
 def visualise_results(folder_path, i, batch_x: torch.Tensor,
                       pred: np.ndarray, true: np.ndarray,
-                      channel_idx: Optional[int]=None):
+                      channel_idx: Optional[int]=None,
+                      file_name: Optional[str]=None):
     """
     Visualise true time series vs prediction for the
     first sample of the batch.
@@ -225,9 +226,14 @@ def visualise_results(folder_path, i, batch_x: torch.Tensor,
         the input series
     pred, true : np.ndarray
         the predicted and ground truth values.
-    channel_idx : int
-        if given, the channel will be plotted.
+    channel_idx : int, optional
+        if given, the channel will be plotted. \n
         Otherwise, a random channel is selected
+    file_name : str, optional
+        The file name (including postfix)
+        to save the figure. e.g. figure.pdf. \n
+        Default is pred_i.pdf where i is the
+        batch id.
     """
     input = batch_x.detach().cpu().numpy()
     num_channels = input.shape[2]  # Number of channels
@@ -236,8 +242,10 @@ def visualise_results(folder_path, i, batch_x: torch.Tensor,
     # concatenate batches
     gt = np.concatenate((input[0, :, channel_idx], true[0, :, channel_idx]), axis=0)
     pd = np.concatenate((input[0, :, channel_idx], pred[0, :, channel_idx]), axis=0)
+    if file_name is None:
+        file_name = 'pred_' + str(i) + '.pdf'
     visual(gt, pd,
-           file_path=os.path.join(folder_path, 'pred_' + str(i) + '.pdf'),
+           file_path=os.path.join(folder_path, file_name),
            title=f'Prediction of channel {channel_idx}')
 
 
