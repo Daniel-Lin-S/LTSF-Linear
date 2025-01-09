@@ -107,7 +107,7 @@ parser.add_argument('--config', type=str, default='configs/config_vae.yaml',
 
 # optimization and training
 parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
-parser.add_argument('--train_epochs_recon', type=int, default=15,
+parser.add_argument('--train_epochs_recon', type=int, default=10,
                     help='number of epochs for training reconstruction model')
 parser.add_argument('--train_epochs_pred', type=int, default=10,
                     help='number of epochs for training prediction model')
@@ -115,13 +115,13 @@ parser.add_argument('--batch_size_recon', type=int, default=16,
                     help='batch size of reconstruction input data')
 parser.add_argument('--batch_size_pred', type=int, default=32,
                     help='batch size of prediction input data')
-parser.add_argument('--patience_recon', type=int, default=4,
+parser.add_argument('--patience_recon', type=int, default=3,
                     help='early stopping patience of reconstruction model')
 parser.add_argument('--patience_pred', type=int, default=3,
                     help='early stopping patience of prediction model')
-parser.add_argument('--learning_rate_recon', type=float, default=0.0001,
+parser.add_argument('--learning_rate_recon', type=float, default=0.001,
                     help='initial optimizer learning rate for reconstruction model')
-parser.add_argument('--learning_rate_pred', type=float, default=0.001,
+parser.add_argument('--learning_rate_pred', type=float, default=0.005,
                     help='initial optimizer learning rate for prediction model')
 parser.add_argument('--loss', type=str, default='mse', help='loss function')
 parser.add_argument('--loss_level', type=str, default='origin',

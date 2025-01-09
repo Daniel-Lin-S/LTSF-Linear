@@ -509,8 +509,8 @@ class Exp_Main(Exp_Basic):
         # write metrics into a txt file
         f = open("result.txt", 'a')
         f.write(setting + "  \n")
-        f.write('mse:{}, mae:{}, rse:{}, corr:{}'.format(
-            metrics['mse'], metrics['mae'], metrics['rse'], metrics['corr']))
+        f.write('mse:{}, mae:{}, rse:{}, mape:{}'.format(
+            metrics['mse'], metrics['mae'], metrics['rse'], metrics['mape']))
         f.write('\n')
         f.write('\n')
         self.logger.log('metrics saved to result.txt', level='debug')
