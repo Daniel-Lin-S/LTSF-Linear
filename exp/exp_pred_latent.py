@@ -277,6 +277,16 @@ class Exp_Latent_Pred(Exp_Main, ABC):
 
                 true_seq, pred_seq = self._extract_prediction(batch_y, pred_seq)
                 loss = criterion(true_seq, pred_seq)
+                if torch.isinf(loss):
+                    self.logger.log(
+                        'Loss overflow to inf', level='error')
+                    raise
+                elif torch.isnan(loss):
+                    self.logger.log(
+                        'Nan values produced during training',
+                        level='error')
+                    raise
+
                 return loss
         else:
             return x_latents_l, x_latents_h, pred_latents_l, pred_latents_h
@@ -322,7 +332,8 @@ class Exp_Latent_Pred(Exp_Main, ABC):
                 batch_start_time = time.time()
 
                 if self.args.loss_level == 'latent':
-                    loss_l, loss_h = self._predict_batch(batch_x, batch_y, criterion)
+                    loss_l, loss_h = self._predict_batch(
+                        batch_x, batch_y, criterion)
 
                     model_optim_l.zero_grad()
                     # Retain computation graph for HF backprop
@@ -524,17 +535,17 @@ class Exp_Latent_Pred(Exp_Main, ABC):
                     batch_x, calculate_loss=False
                 )
 
-                y_segments = self._segment_sequence(batch_y, self.args.recon_len)
-                y_lat_l, y_lat_h = self._process_latents(y_segments)
-                y_lat_l = y_lat_l[:, -pred_lat_l.shape[1]:, :]
-                y_lat_h = y_lat_h[:, -pred_lat_h.shape[1]:, :]
-                y_lat_l = y_lat_l.detach().cpu().numpy()
-                y_lat_h = y_lat_h.detach().cpu().numpy()
-
                 pred_seq = self._reconstruct_sequence(
                     pred_lat_l, pred_lat_h)
                 
                 true_seq, pred_seq = self._extract_prediction(batch_y, pred_seq)
+
+                # obtain latents of the ground truth
+                y_segments = self._segment_sequence(
+                    true_seq, self.args.recon_len)
+                y_lat_l, y_lat_h = self._process_latents(y_segments)
+                y_lat_l = y_lat_l.detach().cpu().numpy()
+                y_lat_h = y_lat_h.detach().cpu().numpy()
 
                 pred = pred_seq.detach().cpu().numpy()
                 true = true_seq.detach().cpu().numpy()

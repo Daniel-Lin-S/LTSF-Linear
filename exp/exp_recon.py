@@ -228,6 +228,13 @@ class Exp_Recon(Exp_Basic):
                     )
                     raise
 
+                if torch.isnan(loss):
+                    self.logger.log(
+                        'Loss becomes NaN while training, stopping the process...',
+                        level='error'
+                    )
+                    raise
+
                 train_loss.append(loss.item())
                 loss.backward()
                 model_optim.step()
