@@ -49,7 +49,8 @@ class DualLogger(Logger):
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
 
-    def log(self, message: str, level: str = "info"):
+    def log(self, message: str, level: str = "info",
+            console_only: bool=False):
         """
         Log a message.
 
@@ -65,7 +66,16 @@ class DualLogger(Logger):
             in console, but can be found in the log file.
             All other levels will be logged to both
             console and log file.
+        console_only : bool, optional
+            if true, the message will only be logged to console
+            but not the log file.
         """
+        if console_only:
+            # Temporarily disable the file handler
+            for handler in self.logger.handlers:
+                if isinstance(handler, logging.FileHandler):
+                    self.logger.removeHandler(handler)
+
         if level == "info":
             self.logger.info(message)
         elif level == "debug":
@@ -76,6 +86,12 @@ class DualLogger(Logger):
             self.logger.error(message)
         elif level == "critical":
             self.logger.critical(message)
+
+        if console_only:
+            # Re-add the file handler
+            for handler in self.logger.handlers:
+                if isinstance(handler, logging.StreamHandler):
+                    self.logger.addHandler(handler)
 
     def start_stage(self, stage_name: str, setting: str):
         """

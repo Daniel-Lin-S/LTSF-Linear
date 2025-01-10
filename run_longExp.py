@@ -150,7 +150,8 @@ if args.is_training:
         result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
         if os.path.exists(result_path):
             logger.log(
-                "Experiment result found in test_results, skipping...")
+                "Experiment result found in test_results, skipping...",
+                console_only=True)
             continue
 
         # Training Stage
@@ -182,7 +183,8 @@ else:
     result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
     if os.path.exists(result_path):
         logger.log(
-            "Experiment result found in test_results, skipping...")
+            "Experiment result found in test_results, skipping...",
+            console_only=True)
         sys.exit()
 
     exp = Exp_Main(args, logger)

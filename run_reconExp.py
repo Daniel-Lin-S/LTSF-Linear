@@ -147,9 +147,7 @@ logger = DualLogger(args.log_file)
 logger.start_experiment(args.model_id, args.is_training)
 logger.log(f'Experiment settings: \n {args}', level='debug')
 
-### Set seeds for iterations ###
 iteration_seeds = [random.randint(0, 2**32 - 1) for _ in range(args.itr)]
-logger.log(f'Random seeds for experiments: {iteration_seeds}', level='debug')
 
 ### Set up GPU devices ###
 if not torch.cuda.is_available() and args.use_gpu:
@@ -248,8 +246,11 @@ if args.is_training > 0:
         result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
         if os.path.exists(result_path) and not args.rerun:
             logger.log(
-                "Experiment result found in test_results, skipping...")
+                "Experiment result found in test_results, skipping...",
+                console_only=True)
             continue
+            
+        logger.log(f'Random seed: {seed}', level='debug')
 
         if args.is_training > 1:
             stage_name = f'{args.model_id} Reconstructor Training_{ii}'
@@ -282,7 +283,8 @@ else:
     result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
     if os.path.exists(result_path) and not args.rerun:
         logger.log(
-            "Experiment result found in test_results, skipping...")
+            "Experiment result found in test_results, skipping...",
+            console_only=True)
         sys.exit()
 
     # path to the reconstruction model
