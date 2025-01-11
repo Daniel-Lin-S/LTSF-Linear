@@ -23,7 +23,7 @@ python -u run_reconExp.py \
   --itr 1 \
   --batch_size_recon 8  \
   --batch_size_pred 16  \
-  --learning_rate_recon 0.002 \
+  --learning_rate_recon 0.001 \
   --learning_rate_pred 0.005 \
   --individual \
   --num_workers 0 \
