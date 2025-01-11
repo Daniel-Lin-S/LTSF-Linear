@@ -401,8 +401,9 @@ class Exp_Recon(Exp_Basic):
 
         reconstructed_data = []
         for segment in segments:
-            batch_x = torch.Tensor(segment).unsqueeze(0)  # (1, recon_len, channels)
-            batch_idx = torch.tensor([0])
+            batch_x = torch.Tensor(segment).unsqueeze(0).to(
+                self.device)  # (1, recon_len, channels)
+            batch_idx = torch.tensor([0]).to(self.device)
             x_rec = self.model(batch_x, batch_idx, return_x_rec=True)
             reconstructed_data.append(x_rec.squeeze(0))
 
