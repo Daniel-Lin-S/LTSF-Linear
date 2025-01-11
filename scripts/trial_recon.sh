@@ -1,12 +1,14 @@
-# for debugging
 if [ ! -d "./logs" ]; then
     mkdir ./logs
 fi
 
+read -p "Enter the value (0, 1, 2, 3) for training state: " is_training_value
+is_training_value=${is_training_value:-2}
+
 for model in NLinear DLinear
 do
 python -u run_reconExp.py \
-  --is_training 2 \
+  --is_training $is_training_value  \
   --root_path ./dataset/electricity/ \
   --data_path electricity.csv \
   --model_id Electricity_336_96 \
