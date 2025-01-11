@@ -534,8 +534,6 @@ class Exp_Latent_Pred(Exp_Main, ABC):
                 x_lat_l, x_lat_h, pred_lat_l, pred_lat_h = self._predict_batch(
                     batch_x, calculate_loss=False
                 )
-                pred_lat_l = pred_lat_l.detach().cpu().numpy()
-                pred_lat_h = pred_lat_h.detach().cpu().numpy()
 
                 pred_seq = self._reconstruct_sequence(
                     pred_lat_l, pred_lat_h)
@@ -548,6 +546,8 @@ class Exp_Latent_Pred(Exp_Main, ABC):
                 y_lat_l, y_lat_h = self._process_latents(y_segments)
                 y_lat_l = y_lat_l.detach().cpu().numpy()
                 y_lat_h = y_lat_h.detach().cpu().numpy()
+                pred_lat_l = pred_lat_l.detach().cpu().numpy()
+                pred_lat_h = pred_lat_h.detach().cpu().numpy()
 
                 pred = pred_seq.detach().cpu().numpy()
                 true = true_seq.detach().cpu().numpy()
