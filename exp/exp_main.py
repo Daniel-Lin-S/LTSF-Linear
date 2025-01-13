@@ -1,6 +1,9 @@
 from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
-from models import Informer, Autoformer, Transformer, DLinear, Linear, NLinear
+from models import (
+    Informer, Autoformer, Transformer,
+    DLinear, Linear, NLinear, SLinear
+)
 from utils.tools import (
     EarlyStopping, adjust_learning_rate, visualise_results, test_params_flop
 )
@@ -84,6 +87,7 @@ class Exp_Main(Exp_Basic):
             'DLinear': DLinear,
             'NLinear': NLinear,
             'Linear': Linear,
+            'SLinear': SLinear
         }
 
         args = model_args if model_args is not None else self.args
