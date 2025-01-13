@@ -22,6 +22,19 @@ class Model(nn.Module):
             self.Linear = nn.Linear(self.seq_len, self.pred_len)
 
     def forward(self, x):
+        """
+        Forward pass of the model.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor with shape (batch_size, seq_len, channels)
+
+        Returns
+        -------
+        torch.Tensor
+            The predicted values with shape (batch_size, pred_len, channels).
+        """
         # x: [Batch, Input length, Channel]
         if self.individual:
             output = torch.zeros([x.size(0),self.pred_len,x.size(2)],dtype=x.dtype).to(x.device)

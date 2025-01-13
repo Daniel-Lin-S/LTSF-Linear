@@ -66,24 +66,12 @@ class Model(nn.Module):
     This model decomposes the input time series into seasonal and trend components, then 
     applies linear regression layers to predict the seasonal and trend components separately. 
     Finally, the predictions for both components are summed to produce the final forecast.
-    
-    Attributes:
-        seq_len (int): Length of the input sequence.
-        pred_len (int): Length of the prediction horizon.
-        decompsition (series_decomp): Decomposition method to
-          separate seasonal and trend components.
-        individual (bool): Whether to apply individual linear models for each channel.
-        channels (int): Number of channels in the input data.
-        Linear_Seasonal (nn.ModuleList or nn.Linear): Linear layer(s) for
-          modeling the seasonal component.
-        Linear_Trend (nn.ModuleList or nn.Linear): Linear layer(s) for
-          modeling the trend component.
     """
     def __init__(self, configs):
         """
         Parameters
         ----------
-        configs : object
+        configs : argparse.Namespace
             Configuration object that contains the following attributes:
             
             - `seq_len` (int): Length of the input sequence.
@@ -115,9 +103,7 @@ class Model(nn.Module):
 
     def forward(self, x):
         """
-        Forward pass of the model. The input time series is decomposed into seasonal 
-        and trend components, then passed through linear models to predict the seasonal 
-        and trend components. The final prediction is the sum of these components.
+        Forward pass of the model.
 
         Parameters
         ----------

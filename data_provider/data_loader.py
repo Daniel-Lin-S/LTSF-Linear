@@ -7,6 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from utils.timefeatures import time_features
 import warnings
 from abc import abstractmethod, ABC
+from typing import Union, Tuple
 
 warnings.filterwarnings('ignore')
 
@@ -115,7 +116,10 @@ class Base_Dataset(Dataset, ABC):
         """
         raise NotImplementedError
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> Union[
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        Tuple[np.ndarray, np.ndarray]
+    ]:
         """
         Sliding window with hop length 1
         """

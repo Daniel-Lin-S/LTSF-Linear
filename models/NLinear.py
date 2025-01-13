@@ -24,6 +24,19 @@ class Model(nn.Module):
             self.Linear = nn.Linear(self.seq_len, self.pred_len)
 
     def forward(self, x):
+        """
+        Forward pass of the model.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor with shape (batch_size, seq_len, channels)
+
+        Returns
+        -------
+        torch.Tensor
+            The predicted values with shape (batch_size, pred_len, channels).
+        """
         # x: [Batch, Input length, Channel]
         seq_last = x[:,-1:,:].detach()
         x = x - seq_last
