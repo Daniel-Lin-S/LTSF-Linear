@@ -226,7 +226,24 @@ elif args.model_recon == 'AE':
     )
 
 elif args.model_recon == 'VQVAE':
-    raise NotImplementedError
+    if config['encoder']['downsampling'] == 'time':
+        width_l = config['encoder']['downsampled_width']['lf']
+        width_h = config['encoder']['downsampled_width']['hf']
+        latent_width = f'lf{width_l}_hf{width_h}'
+    elif config['encoder']['downsampling'] == 'freq':
+        latent_width = config['encoder']['downsampled_width']['freq']
+    
+    model_setting = 'hd{}_fb{}_lw{}_nfft{}_split[{}]_sep[{}]_cblf{}_cbhf{}_cbarg{}'.format(
+        config['encoder']['hid_dim'],
+        config['encoder']['frequency_bandwidth'],
+        latent_width,
+        config['n_fft'],
+        config['stft_split_type'],
+        config['lfhf_separation'],
+        config['VQ-VAE']['codebook_sizes']['lf'],
+        config['VQ-VAE']['codebook_sizes']['hf'],
+        config['VQ-VAE']['codebook']
+    )
 else:
     raise NotImplementedError
 
@@ -263,6 +280,8 @@ if args.is_training > 0:
             args.checkpoints, setting, 'reconstructor.pth')
         
         if args.is_training < 3:
+            if args.model_recon == 'VQVAE':
+                raise NotImplementedError
             stage_name = f'{args.model_id} Latent Predictor Training_{ii}'
             logger.start_stage(stage_name, setting)
             exp_pred = Exp_pred(args_pred, model_path, config, logger)

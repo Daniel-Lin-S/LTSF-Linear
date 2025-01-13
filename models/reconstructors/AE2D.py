@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 import os
 from einops import rearrange
-from typing import Optional
+from typing import Optional, Union
 from layers.VQVAE_EncDec import VQVAEEncoder, VQVAEDecoder
 from utils.time_freq import (
     compute_downsample_rate,
@@ -86,7 +86,8 @@ class AE2D(nn.Module):
 
     def forward(self, batch_x: torch.Tensor, batch_idx: int,
                 return_x_rec: bool = False, save_recon: bool = False,
-                folder_path: Optional[str] = None) -> torch.Tensor:
+                folder_path: Optional[str] = None
+                ) -> Union[torch.Tensor, dict]:
         """
         Forward pass for reconstruction.
 
@@ -109,6 +110,9 @@ class AE2D(nn.Module):
         torch.Tensor
             If return_x_rec=True, returns the reconstructed tensor
             with shape (batch_size, length, channels).
+        dict
+            If return_x_rec=False,
+            returns a dicitonary with all loss terms.
         """
         x = rearrange(batch_x, 'b l c -> b c l')
 

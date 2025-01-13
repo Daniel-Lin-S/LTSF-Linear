@@ -15,7 +15,7 @@ from utils.tools import (
     EarlyStopping, adjust_learning_rate, plot_reconstruction_for_channels
 )
 from utils.logger import Logger
-from models.reconstructors import VAE2D, AE2D
+from models.reconstructors import VAE2D, AE2D, VQVAE
 from exp.exp_basic import Exp_Basic
 
 
@@ -31,7 +31,8 @@ class Exp_Recon(Exp_Basic):
       and other necessary arguments,
       which can be set up in the _configure_epoch_args function.
     - The forward method must return a dictionary
-      of the losses.
+      of the losses. (each value being a torch.Tensor
+      with 0 dimensions)
     - For visualisation of a batch while validating,
       define the forward method with
       save_recon (bool) and folder_path (str)
@@ -84,7 +85,8 @@ class Exp_Recon(Exp_Basic):
         """
         model_dict = {
             'VAE' : VAE2D,
-            'AE' : AE2D
+            'AE' : AE2D,
+            'VQVAE' : VQVAE
         }
 
         args = self.args
@@ -247,7 +249,7 @@ class Exp_Recon(Exp_Basic):
                         f"Step: {i+1}/{train_steps}, " + \
                             f"Total Loss: {loss.item():.4f}; "
                     detailed_message = "Loss breakdown: " + \
-                        f"{', '.join([f'{key}: {value:.4f}'
+                        f"{', '.join([f'{key}: {value.item():.4f}'
                                       for key, value in loss_dict.items()
                                       if key != 'total'])}"
                     self.logger.log(batch_message+detailed_message,
@@ -351,11 +353,17 @@ class Exp_Recon(Exp_Basic):
                     folder_path=folder_path, **epoch_args)
                 
                 total_loss.append(loss_dict['total'].item())
-
-            loss_message = f"{flag} Loss breakdown: " + \
-                f"{', '.join([f'{key}: {value:.4f}'
-                              for key, value in loss_dict.items()
-                              if key != 'total'])}"
+            try:
+                loss_message = f"{flag} Loss breakdown: " + \
+                    f"{', '.join([f'{key}: {value.item():.4f}'
+                                for key, value in loss_dict.items()
+                                if key != 'total'])}"
+            except AttributeError:
+                for key, item in loss_dict.items():
+                    print(f'key {key}, type {type(item)}')
+                self.logger.log('Values of loss_dict should be torch Tensors',
+                                level='error')
+                raise
             self.logger.log(loss_message, level='debug')
 
         total_loss = np.average(total_loss)

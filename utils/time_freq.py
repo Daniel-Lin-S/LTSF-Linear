@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 import torch.jit as jit
 import torch.nn as nn
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 from einops import rearrange, repeat
 import matplotlib.pyplot as plt
 
@@ -129,14 +129,7 @@ def time_to_timefreq(x: torch.Tensor, n_fft: int,
             f'must be longer than n_fft, {n_fft}')
 
     x = rearrange(x, 'b c l -> (b c) l')
-    # stft not supporting MPS device yet, manual fallback to CPU
-    if x.device.type == 'mps':
-        using_mps = True
-        x = x.to('cpu')
-        window = torch.hann_window(window_length=n_fft, device='cpu')
-    else:
-        using_mps = False
-        window = torch.hann_window(window_length=n_fft, device=x.device)
+    window = torch.hann_window(window_length=n_fft, device=x.device)
 
     x = torch.stft(x, n_fft, normalized=norm, return_complex=True,
                    window=window)
@@ -160,10 +153,7 @@ def time_to_timefreq(x: torch.Tensor, n_fft: int,
             'split_type must be one of real_imag, '
             'magnitude_phase, none')
 
-    if using_mps:
-        return x.to('mps')
-    else:
-        return x
+    return x
 
 
 def timefreq_to_time(x: torch.Tensor, n_fft: int, C: int,
@@ -212,22 +202,12 @@ def timefreq_to_time(x: torch.Tensor, n_fft: int, C: int,
     else:
         raise ValueError(f"Unsupported split_type: {split_type}")
     
-    # istft not supporting MPS device yet, manual fallback to CPU
-    if x.device.type == 'mps':
-        using_mps = True
-        x = x.to('cpu')
-        window = torch.hann_window(window_length=n_fft, device='cpu')
-    else:
-        using_mps = False
-        window = torch.hann_window(window_length=n_fft, device=x.device)
+    window = torch.hann_window(window_length=n_fft, device=x.device)
 
     x = torch.istft(x, n_fft, normalized=norm, window=window)
     x = rearrange(x, '(b c) l -> b c l', c=C)
 
-    if using_mps:
-        return x.to('mps')
-    else:
-        return x
+    return x
     
 
 def zero_pad_high_freq(xf: torch.Tensor,
@@ -379,7 +359,7 @@ def plot_lfhf_reconstruction(x_l, xhat_l, x_h, xhat_h,
         u_l_recon, alpha=alpha)
     axes[0].set_title(r'$x_l$ (LF)')
     y_min_l, y_max_l = min(u_l.min(), u_l_recon.min()), \
-                    max(u_l.max(), u_l.max())
+                    max(u_l.max(), u_l_recon.max())
     axes[0].set_ylim(y_min_l - 0.1, y_max_l + 0.1)
 
     # Plot high-frequency component
@@ -483,3 +463,75 @@ class SnakeActivation(jit.ScriptModule):
             when input is an image.
         """
         return x + (1 / self.a) * torch.sin(self.a * x) ** 2
+
+def quantize(z: torch.Tensor, vq_model,
+             transpose_channel_length_axes: bool=False,
+             svq_temp:Union[float,None]=None):
+    """
+    quantise embedding z according to whether
+    it is temporal or temporal-frequency representation.
+
+    Arguments
+    ---------
+    z : torch.Tensor
+        of shape (b c h w) or (b c l). \n
+        l is (the length of) temporal axis,
+        h w are frequency and temporal axes,
+        b is batch size, c is number of channels
+    vq_model : VectorQuantize
+        the Vector Quantisation model to be used. \n
+        Note: codeword is always assigned to
+        the last axis of input
+    transpose_channel_length_axes : bool, optional
+        only for time representation. \n
+        If true, each channel will be assigned a codeword; \n
+        otherwise, each time stamp is assigned a codeword.
+    sqv_temp: float, optional
+        Draw the codeword weighted by Euclidean distance,
+        higher temperature gives more uniform distribution. \n
+        If not given, deterinistically chooses the closest codeword.
+
+    Returns
+    -------
+    z_q : torch.Tensor
+        The quantized tensor where feature vectors are
+        replaced with their corresponding codewords. \n
+        Output shape: (b d h w)
+        or (b d l) or (b c d),
+        where d is codebook dimension.
+    indices : torch.Tensor
+        Indices of the codewords selected for each feature vector.
+    vq_loss : dict
+        A dictionary containing the following keys:
+        - `commit_loss`: The commitment loss, encouraging the input to
+        stay close to the selected codewords.
+        - `orthogonal_reg_loss`: The orthogonal regularization loss,
+        ensuring codebook embeddings remain diverse.
+        - `loss`: The weighted sum of `commit_loss` and `orthogonal_reg_loss`,
+        used as the total quantization loss.
+    perplexity : float
+        A measure of codebook usage diversity.
+
+    Raises
+    ------
+    ValueError
+        If the input tensor's dimensionality is not 3D or 4D
+    """
+    input_dim = len(z.shape) - 2
+    if input_dim == 2:
+        # quantise each spatial location on time-frequency image
+        h, w = z.shape[2:]
+        z = rearrange(z, 'b c h w -> b (h w) c')
+        z_q, indices, vq_loss, perplexity = vq_model(z, svq_temp)
+        z_q = rearrange(z_q, 'b (h w) c -> b c h w', h=h, w=w)
+    elif input_dim == 1:
+        if transpose_channel_length_axes:
+            z = rearrange(z, 'b c l -> b (l) c')
+        z_q, indices, vq_loss, perplexity = vq_model(z, svq_temp)
+        if transpose_channel_length_axes:
+            z_q = rearrange(z_q, 'b (l) c -> b c l')
+    else:
+        raise ValueError(
+            'z must have either 3 or 4 dimensions'
+        )
+    return z_q, indices, vq_loss, perplexity
