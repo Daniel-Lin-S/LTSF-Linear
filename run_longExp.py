@@ -6,6 +6,7 @@ import numpy as np
 import os
 import sys
 from utils.logger import DualLogger
+from utils.configs import get_base_settings, get_pred_model_settings
 
 
 ### Set Global seed for reproducibility ###
@@ -22,28 +23,36 @@ parser = argparse.ArgumentParser(description='Autoformer & Transformer family fo
 parser.add_argument('--is_training', type=int, required=True, help='status')
 parser.add_argument('--train_only', type=bool, required=False, default=False,
                     help='perform training on full input dataset without validation and testing')
-parser.add_argument('--model_id', type=str, required=True, help='model id')
-parser.add_argument('--model', type=str, required=True,
-                    help='model name, options: [Autoformer, Informer, Transformer, DLinear, Linear, NLinear]')
-parser.add_argument('--itr', type=int, default=2, help='number of experiment repetitions')
 parser.add_argument('--test_idx', type=int, default=0,
                     help='index of the experiment repetition used for testing'
                     ' if is_training = 0')
+parser.add_argument('--model_id', type=str, required=True, help='model id')
+parser.add_argument('--model', type=str, required=True,
+                    help='model name, options: [Autoformer, Informer, Transformer, '
+                    'DLinear, Linear, NLinear, SLinear]')
+parser.add_argument('--itr', type=int, default=2, help='number of experiment repetitions')
 parser.add_argument('--des', type=str, default='',
                     help='experiment description added at the end of folder name')
 parser.add_argument('--log_file', type=str, default='logs/test.log',
                     help='file path of log file for the training process')
+parser.add_argument('--do_predict', action='store_true',
+                    help='whether to predict unseen future data')
 
 # data loader
 parser.add_argument('--data', type=str, required=True, help='dataset type')
 parser.add_argument('--root_path', type=str, default='./datasets/', help='root path of the data file')
 parser.add_argument('--data_path', type=str, default='ETTh1.csv', help='data file')
 parser.add_argument('--features', type=str, default='M',
-                    help='forecasting task, options:[M, S, MS]; M:multivariate predict multivariate, S:univariate predict univariate, MS:multivariate predict univariate')
+                    help='forecasting task, options:[M, S, MS]; '
+                    'M:multivariate predict multivariate, '
+                    'S:univariate predict univariate, MS:multivariate predict univariate')
 parser.add_argument('--target', type=str, default='OT', help='target feature in S or MS task')
 parser.add_argument('--freq', type=str, default='h',
-                    help='freq for time features encoding, options:[s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], you can also use more detailed freq like 15min or 3h')
-parser.add_argument('--checkpoints', type=str, default='./checkpoints/', help='location of model checkpoints')
+                    help='freq for time features encoding, options:[s:secondly, '
+                    't:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], '
+                    'you can also use more detailed freq like 15min or 3h')
+parser.add_argument('--checkpoints', type=str, default='./checkpoints/',
+                    help='location of model checkpoints')
 
 # forecasting task
 parser.add_argument('--seq_len', type=int, default=96, help='input sequence length') # 96=24*4
@@ -54,7 +63,14 @@ parser.add_argument('--hop_length', type=int, default=1,
                     'of the prediction model')
 
 # DLinear
-parser.add_argument('--individual', action='store_true', default=False, help='DLinear: a linear layer for each variate(channel) individually')
+parser.add_argument('--individual', action='store_true', default=False,
+                    help='For linear models, a linear layer for each variate(channel) individually')
+
+# SLinear
+parser.add_argument('--stft_hop_length', type=int, default=4,
+                    help='SLinear: hop length of sliding window for STFT')
+parser.add_argument('--nfft', type=int, default=8, help='SLinear: number of FFT points')
+
 # Formers 
 parser.add_argument('--embed_type', type=int, default=0, help='0: default 1: value embedding + temporal embedding + positional embedding 2: value embedding + temporal embedding 3: value embedding + positional embedding 4: value embedding')
 parser.add_argument('--enc_in', type=int, default=7, help='encoder input size') # DLinear with --individual, use this hyperparameter as the number of channels
@@ -75,7 +91,6 @@ parser.add_argument('--embed', type=str, default='timeF',
                     help='time features encoding, options:[timeF, fixed, learned]')
 parser.add_argument('--activation', type=str, default='gelu', help='activation')
 parser.add_argument('--output_attention', action='store_true', help='whether to output attention in ecoder')
-parser.add_argument('--do_predict', action='store_true', help='whether to predict unseen future data')
 
 # optimization
 parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
@@ -119,32 +134,18 @@ if args.use_gpu and args.use_multi_gpu:
 iteration_seeds = [random.randint(0, 2**32 - 1) for _ in range(args.itr)]
 logger.log(f'Random seeds for experiments: {iteration_seeds}', level='debug')
 
-base_setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}'.format(
-    args.model_id,
-    args.model,
-    args.data,
-    args.features,
-    args.seq_len,
-    args.label_len,
-    args.pred_len,
-    args.d_model,
-    args.n_heads,
-    args.e_layers,
-    args.d_layers,
-    args.d_ff,
-    args.factor,
-    args.embed,
-    args.distil,
-    args.des
-)
+### Record basic and model settings ###
+base_setting = get_base_settings(args)
+model_setting = get_pred_model_settings(args)
 
+### store model hyperparameters ###
 if args.is_training:
     for ii, seed in enumerate(iteration_seeds):
         random.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
 
-        setting = f'{base_setting}_{ii}'
+        setting = f'{base_setting}_{model_setting}_{args.des}_{ii}'
 
         # skip if already tested
         result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
@@ -177,7 +178,7 @@ if args.is_training:
 
         torch.cuda.empty_cache()
 else:
-    setting = f'{base_setting}_{args.test_idx}'
+    setting = f'{base_setting}_{model_setting}_{args.des}_{args.test_idx}'
 
     # skip if already tested
     result_path = './test_results/' + setting + '/' + 'pred_0.pdf'

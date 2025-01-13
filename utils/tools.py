@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 from typing import Optional, List
 import os
 import yaml
-import argparse
-from copy import deepcopy
 
 from utils.logger import Logger
 
@@ -284,54 +282,11 @@ def load_yaml_param_settings(yaml_fname: str):
     return config
 
 
-def split_args_two_stages(args: argparse.Namespace):
-    """
-    Splits the namespace into two separate namespaces for
-    reconstruction and prediction stages.
-
-    Parameters
-    ----------
-    args : argparse.Namespace
-        Input arguments.
-
-    Returns
-    -------
-    recon_args : argparse.Namespace
-        Arguments for reconstruction.
-    pred_args : argparse.Namespace
-        Arguments for prediction.
-    """
-    # Convert to dictionary
-    args_dict = vars(args)
-
-    recon_args = deepcopy(args_dict)
-    pred_args = deepcopy(args_dict)
-
-    # Update stage-specific arguments
-    recon_args["model"] = args.model_recon
-    pred_args["model"] = args.model_pred
-    recon_args["batch_size"] = args.batch_size_recon
-    pred_args["batch_size"] = args.batch_size_pred
-    recon_args["train_epochs"] = args.train_epochs_recon
-    pred_args["train_epochs"] = args.train_epochs_pred
-    recon_args["hop_length"] = args.hop_length_recon
-    pred_args["hop_length"] = args.hop_length_pred
-    recon_args["patience"] = args.patience_recon
-    pred_args["patience"] = args.patience_pred
-    recon_args["learning_rate"] = args.learning_rate_recon
-    pred_args["learning_rate"] = args.learning_rate_pred
-
-    # Convert back to namespaces
-    recon_args = argparse.Namespace(**recon_args)
-    pred_args = argparse.Namespace(**pred_args)
-
-    return recon_args, pred_args
-
-
 def plot_reconstruction_for_channels(
         origin: np.ndarray, recon: np.ndarray,
         channels_to_plot: List[int],
         save_path: Optional[str]=None,
+        plot: bool=False,
         title: Optional[str]=None):
     """
     Plots the original and reconstructed time-series sequences
@@ -351,6 +306,10 @@ def plot_reconstruction_for_channels(
         If not given, the canvas will be returned,
         but nothing saved. Please use plt.show()
         or plt.savefig() outside in this case.
+    
+    plot : bool, optional
+        if true, the figure will be plotted directly,
+        no file saved
     
     title : str, optional
         The overall title of the plot.
@@ -383,6 +342,11 @@ def plot_reconstruction_for_channels(
         axes[i].plot(recon[:, channel], label="Reconstructed", alpha=0.7)
         axes[i].set_title(f"Channel {channel}")
         axes[i].legend()
+
+    if plot:
+        plt.tight_layout()
+        plt.show()
+        return
 
     # Save the figure to the specified path
     if save_path:

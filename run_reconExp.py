@@ -5,8 +5,12 @@ import numpy as np
 import os
 import sys
 
-from utils.tools import load_yaml_param_settings, split_args_two_stages
+from utils.tools import load_yaml_param_settings
 from utils.logger import DualLogger
+from utils.configs import (
+    split_args_two_stages, get_base_settings,
+    get_pred_model_settings, get_recon_model_settings
+)
 from exp.exp_recon import Exp_Recon
 from exp.exp_pred_vae import Exp_VAE2D_Pred
 from exp.exp_pred_ae import Exp_AE2D_Pred
@@ -162,90 +166,19 @@ if args.use_gpu and args.use_multi_gpu:
     args.device_ids = [int(id_) for id_ in device_ids]
     args.gpu = args.device_ids[0]
 
-### Prepare basic and model settings ###
-base_setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_loss[{}_{}]_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}'.format(
-    args.model_id,
-    args.model_recon,
-    args.model_pred,
-    args.features,
-    args.seq_len,
-    args.label_len,
-    args.pred_len,
-    args.loss,
-    args.loss_level,
-    args.d_model,
-    args.n_heads,
-    args.e_layers,
-    args.d_layers,
-    args.d_ff,
-    args.factor,
-    args.embed
-)
-
+### Record basic and model settings ###
 config = load_yaml_param_settings(args.config)
 
-if args.model_recon == 'VAE':
-    Exp_pred = Exp_VAE2D_Pred
+base_setting = get_base_settings(args)
+recon_model_setting = get_recon_model_settings(args, config)
+pred_model_setting = get_pred_model_settings(args)
+model_setting = f'{pred_model_setting}_{recon_model_setting}'
 
-    if config['encoder']['downsampling'] == 'time':
-        width_l = config['encoder']['downsampled_width']['lf']
-        width_h = config['encoder']['downsampled_width']['hf']
-        latent_width = f'lf{width_l}_hf{width_h}'
-    elif config['encoder']['downsampling'] == 'freq':
-        latent_width = config['encoder']['downsampled_width']['freq']
-
-    model_setting = 'hd{}_fb{}_lw{}_ld{}_lt[{}]_beta{}->{}_nfft{}_split[{}]_sep[{}]'.format(
-        config['encoder']['hid_dim'],
-        config['encoder']['frequency_bandwidth'],
-        latent_width,
-        config['vae']['latent_dim'],
-        config['vae']['latent_type'],
-        config['vae']['beta_init'],
-        config['vae']['beta'],
-        config['n_fft'],
-        config['stft_split_type'],
-        config['lfhf_separation']
-    )
-elif args.model_recon == 'AE':
+### Set specific latent prediction experiment ###
+if args.model_recon == 'AE':
     Exp_pred = Exp_AE2D_Pred
-
-    if config['encoder']['downsampling'] == 'time':
-        width_l = config['encoder']['downsampled_width']['lf']
-        width_h = config['encoder']['downsampled_width']['hf']
-        latent_width = f'lf{width_l}_hf{width_h}'
-    elif config['encoder']['downsampling'] == 'freq':
-        latent_width = config['encoder']['downsampled_width']['freq']
-    
-    model_setting = 'hd{}_fb{}_lw{}_nfft{}_split[{}]_sep[{}]'.format(
-        config['encoder']['hid_dim'],
-        config['encoder']['frequency_bandwidth'],
-        latent_width,
-        config['n_fft'],
-        config['stft_split_type'],
-        config['lfhf_separation']
-    )
-
-elif args.model_recon == 'VQVAE':
-    if config['encoder']['downsampling'] == 'time':
-        width_l = config['encoder']['downsampled_width']['lf']
-        width_h = config['encoder']['downsampled_width']['hf']
-        latent_width = f'lf{width_l}_hf{width_h}'
-    elif config['encoder']['downsampling'] == 'freq':
-        latent_width = config['encoder']['downsampled_width']['freq']
-    
-    model_setting = 'hd{}_fb{}_lw{}_nfft{}_split[{}]_sep[{}]_cblf{}_cbhf{}_cbarg{}'.format(
-        config['encoder']['hid_dim'],
-        config['encoder']['frequency_bandwidth'],
-        latent_width,
-        config['n_fft'],
-        config['stft_split_type'],
-        config['lfhf_separation'],
-        config['VQ-VAE']['codebook_sizes']['lf'],
-        config['VQ-VAE']['codebook_sizes']['hf'],
-        config['VQ-VAE']['codebook']
-    )
-else:
-    raise NotImplementedError
+elif args.model_recon == 'VAE':
+    Exp_pred = Exp_VAE2D_Pred
 
 ### Two-stage Training and Testing ###
 args_recon, args_pred = split_args_two_stages(args)
@@ -280,6 +213,7 @@ if args.is_training > 0:
             args.checkpoints, setting, 'reconstructor.pth')
         
         if args.is_training < 3:
+            # TODO - design VQVAE predictor or remove this
             if args.model_recon == 'VQVAE':
                 raise NotImplementedError
             stage_name = f'{args.model_id} Latent Predictor Training_{ii}'

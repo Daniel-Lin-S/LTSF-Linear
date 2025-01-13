@@ -73,7 +73,8 @@ def compute_downsample_rate(input_length: int,
 
 def time_to_timefreq(x: torch.Tensor, n_fft: int,
                      C: int, norm:bool=True,
-                     split_type: str='real_imag'):
+                     split_type: str='real_imag',
+                     stft_kwargs: Optional[dict]=None):
     """
     Arguments
     ----------
@@ -97,6 +98,9 @@ def time_to_timefreq(x: torch.Tensor, n_fft: int,
           magnitude and phase components.
         - 'none' : does not split the complex values,
           i.e., keeps them as complex.
+    stft_kwargs : dict
+        additional arguments passed to torch.stft,
+        e.g. hop_length
 
     Return
     ------
@@ -131,8 +135,14 @@ def time_to_timefreq(x: torch.Tensor, n_fft: int,
     x = rearrange(x, 'b c l -> (b c) l')
     window = torch.hann_window(window_length=n_fft, device=x.device)
 
-    x = torch.stft(x, n_fft, normalized=norm, return_complex=True,
-                   window=window)
+    if stft_kwargs:
+        x = torch.stft(x, n_fft, normalized=norm,
+                       return_complex=True,
+                       window=window, **stft_kwargs)
+    else:
+        x = torch.stft(x, n_fft, normalized=norm,
+                       return_complex=True,
+                       window=window)
 
     if split_type == 'real_imag':
         # Split into real and imaginary parts
@@ -158,7 +168,8 @@ def time_to_timefreq(x: torch.Tensor, n_fft: int,
 
 def timefreq_to_time(x: torch.Tensor, n_fft: int, C: int,
                      split_type: str = 'real_imag', 
-                     norm:bool=True) -> torch.Tensor:
+                     norm:bool=True,
+                     stft_kwargs: Optional[dict]=None) -> torch.Tensor:
     """
     Convert time-frequency domain tensor (STFT representation) back to the time domain.
 
@@ -177,6 +188,9 @@ def timefreq_to_time(x: torch.Tensor, n_fft: int, C: int,
         - 'none' : complex-valued.
     norm : bool, optional
         Whether to normalize the ISTFT (default: True).
+    stft_kwargs : dict
+        additional arguments passed to torch.istft,
+        e.g. hop_length
     
     Return
     ------
@@ -204,7 +218,12 @@ def timefreq_to_time(x: torch.Tensor, n_fft: int, C: int,
     
     window = torch.hann_window(window_length=n_fft, device=x.device)
 
-    x = torch.istft(x, n_fft, normalized=norm, window=window)
+    if stft_kwargs:
+        x = torch.istft(x, n_fft, normalized=norm,
+                       window=window, **stft_kwargs)
+    else:
+        x = torch.istft(x, n_fft, normalized=norm,
+                       window=window)
     x = rearrange(x, '(b c) l -> b c l', c=C)
 
     return x
@@ -276,7 +295,8 @@ def zero_pad_low_freq(xf: torch.Tensor,
 
 
 def stft_lfhf(x: torch.Tensor,
-              n_fft: int) -> Tuple[torch.Tensor, torch.Tensor]:
+              n_fft: int,
+              **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Apply STFT to a batch of time series and
     return the LF (mean energy) and HF components (oscillating patterns)
@@ -289,6 +309,11 @@ def stft_lfhf(x: torch.Tensor,
         the time series samples
     n_fft : int
         Size of FFT used for STFT
+    kwargs : Any
+        additional arguments passed to
+        time_to_timefreq and timefreq_to_time.
+        Note: number of channels will be calculated
+        automatically.
 
     Returns
     -------
@@ -299,14 +324,14 @@ def stft_lfhf(x: torch.Tensor,
     """
     in_channels = x.shape[1]
     input_length = x.shape[2]
-    xf = time_to_timefreq(x, n_fft, in_channels)  # (b c h w)
+    xf = time_to_timefreq(x, n_fft, in_channels, **kwargs)  # (b c h w)
     u_l = zero_pad_high_freq(xf)  # (b c h w)
     x_l = F.interpolate(
-        timefreq_to_time(u_l, n_fft, in_channels),
+        timefreq_to_time(u_l, n_fft, in_channels, **kwargs),
         input_length, mode='linear')  # (b c l)
     u_h = zero_pad_low_freq(xf)  # (b c h w)
     x_h = F.interpolate(
-        timefreq_to_time(u_h, n_fft, in_channels),
+        timefreq_to_time(u_h, n_fft, in_channels, **kwargs),
         input_length, mode='linear')  # (b c l)
 
     return x_l, x_h
