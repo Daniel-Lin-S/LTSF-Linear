@@ -23,7 +23,6 @@ python -u run_longExp.py \
   --data_path exchange_rate.csv \
   --model_id Exchange_$seq_len'_'$pred_len \
   --model $model_name \
-  --stft_hop_length $stft_hop_length \
   --nfft $nfft \
   --data custom \
   --features M \
@@ -32,7 +31,8 @@ python -u run_longExp.py \
   --enc_in 8 \
   --des 'Exp' \
   --gpu $gpu_id \
-  --itr $repeat --batch_size 8 --learning_rate 0.005 --individual \
+  --itr $repeat --batch_size 8 \
+  --learning_rate 0.005 --individual \
   --log_file logs/STFT/$model_name'_I_'exchange_$seq_len'_'$pred_len.log 
 done
 done
