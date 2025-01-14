@@ -11,16 +11,12 @@ fi
 seq_len=336
 repeat=3
 gpu_id=0
-stft_hop_lengths=(4 8 16)
-nffts=(8 16 32)
 for model_name in FDLinear STFTLinear
 do 
 for pred_len in 96 192 336 720
 do
-for i in "${!nffts[@]}"
+for nfft in 8 16 32
 do
-nfft="${nffts[$i]}"
-stft_hop_length="${stft_hop_lengths[$i]}"
 python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/exchange_rate/ \

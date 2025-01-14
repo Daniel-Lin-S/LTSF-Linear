@@ -39,7 +39,7 @@ class Exp_Basic(ABC):
             f"{format_large_int(total_static_params)}. "
         )
         if self.logger:
-            self.logger.log(message, level='debug')
+            self.logger.log(message, level='info')
         else:
             print(message)
 
