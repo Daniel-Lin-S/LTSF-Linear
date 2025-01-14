@@ -1,3 +1,5 @@
+#!/bin/bash
+
 if [ ! -d "./logs" ]; then
     mkdir ./logs
 fi
@@ -17,8 +19,8 @@ for pred_len in 96 192 336 720
 do
 for i in "${!nffts[@]}"
 do
-nfft="$nffts[$i]"
-stft_hop_length="$stft_hop_lengths[$i]"
+nfft="${nffts[$i]}"
+stft_hop_length="${stft_hop_lengths[$i]}"
 python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/exchange_rate/ \
