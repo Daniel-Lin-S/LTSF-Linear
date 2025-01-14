@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
-from utils.time_freq import (
-    time_to_timefreq, timefreq_to_time, zero_pad_high_freq, zero_pad_low_freq
-)
+from utils.time_freq import stft_lfhf
 from einops import rearrange
 
 
@@ -69,19 +67,8 @@ class Model(nn.Module):
         x = rearrange(x, 'b l c -> b c l')
         
         # Decompose into time-frequency domain using STFT
-        C = x.shape[1]
-        xf = time_to_timefreq(x, self.nfft, C,
-                              stft_kwargs={'hop_length': self.hop_length})  # [b, c, f, t]
-        
-        # Zero pad high and low frequencies
-        u_l = zero_pad_high_freq(xf)
-        u_h = zero_pad_low_freq(xf)
-        
-        # Apply linear projection to frequency channels
-        x_l = timefreq_to_time(u_l, self.nfft, C,
-                               stft_kwargs={'hop_length': self.hop_length})  # [b, c, l]
-        x_h = timefreq_to_time(u_h, self.nfft, C,
-                               stft_kwargs={'hop_length': self.hop_length})  # [b, c, l]
+        x_l, x_h = stft_lfhf(x, self.nfft,
+                             stft_kwargs={'hop_length': self.hop_length})
         
         # Prediction for each frequency component
         if self.individual:

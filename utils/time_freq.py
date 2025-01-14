@@ -177,6 +177,7 @@ def timefreq_to_time(x: torch.Tensor, n_fft: int, C: int,
     ----------
     x : torch.Tensor
         The input tensor in the time-frequency domain.
+        Shape (batch_size, channels, frequencies, length)
     n_fft : int
         The FFT size used during the STFT.
     C : int

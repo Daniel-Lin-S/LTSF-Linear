@@ -17,7 +17,8 @@ np.random.seed(fix_seed)
 
 
 ### Collect Arguments ###
-parser = argparse.ArgumentParser(description='Autoformer & Transformer family for Time Series Forecasting')
+parser = argparse.ArgumentParser(
+    description='Time Series Forecasting Experiment settings')
 
 # basic config
 parser.add_argument('--is_training', type=int, required=True, help='status')
@@ -29,7 +30,7 @@ parser.add_argument('--test_idx', type=int, default=0,
 parser.add_argument('--model_id', type=str, required=True, help='model id')
 parser.add_argument('--model', type=str, required=True,
                     help='model name, options: [Autoformer, Informer, Transformer, '
-                    'DLinear, Linear, NLinear, SLinear]')
+                    'DLinear, Linear, NLinear, FDLinear]')
 parser.add_argument('--itr', type=int, default=2, help='number of experiment repetitions')
 parser.add_argument('--des', type=str, default='',
                     help='experiment description added at the end of folder name')
@@ -66,14 +67,19 @@ parser.add_argument('--hop_length', type=int, default=1,
 parser.add_argument('--individual', action='store_true', default=False,
                     help='For linear models, a linear layer for each variate(channel) individually')
 
-# SLinear
+# FDLinear and STFTLinear
 parser.add_argument('--stft_hop_length', type=int, default=4,
-                    help='SLinear: hop length of sliding window for STFT')
-parser.add_argument('--nfft', type=int, default=8, help='SLinear: number of FFT points')
+                    help='FDLinear: hop length of sliding window for STFT')
+parser.add_argument('--nfft', type=int, default=8, help='FDLinear: number of FFT points')
 
 # Formers 
-parser.add_argument('--embed_type', type=int, default=0, help='0: default 1: value embedding + temporal embedding + positional embedding 2: value embedding + temporal embedding 3: value embedding + positional embedding 4: value embedding')
-parser.add_argument('--enc_in', type=int, default=7, help='encoder input size') # DLinear with --individual, use this hyperparameter as the number of channels
+parser.add_argument('--embed_type', type=int, default=0,
+                    help='0: default '
+                    '1: value embedding + temporal embedding + positional embedding '
+                    '2: value embedding + temporal embedding '
+                    '3: value embedding + positional embedding 4: value embedding')
+# Linear models with --individual should use enc_in as the number of channels
+parser.add_argument('--enc_in', type=int, default=7, help='encoder input size') 
 parser.add_argument('--dec_in', type=int, default=7, help='decoder input size')
 parser.add_argument('--c_out', type=int, default=7, help='output size')
 parser.add_argument('--d_model', type=int, default=512, help='dimension of model')
@@ -84,13 +90,15 @@ parser.add_argument('--d_ff', type=int, default=2048, help='dimension of fcn')
 parser.add_argument('--moving_avg', type=int, default=25, help='window size of moving average')
 parser.add_argument('--factor', type=int, default=1, help='attn factor')
 parser.add_argument('--distil', action='store_false',
-                    help='whether to use distilling in encoder, using this argument means not using distilling',
+                    help='whether to use distilling in encoder, '
+                    'using this argument means not using distilling',
                     default=True)
 parser.add_argument('--dropout', type=float, default=0.05, help='dropout')
 parser.add_argument('--embed', type=str, default='timeF',
                     help='time features encoding, options:[timeF, fixed, learned]')
 parser.add_argument('--activation', type=str, default='gelu', help='activation')
-parser.add_argument('--output_attention', action='store_true', help='whether to output attention in ecoder')
+parser.add_argument('--output_attention',
+                    action='store_true', help='whether to output attention in ecoder')
 
 # optimization
 parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
@@ -100,7 +108,8 @@ parser.add_argument('--patience', type=int, default=3, help='early stopping pati
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='optimizer learning rate')
 parser.add_argument('--loss', type=str, default='mse', help='loss function')
 parser.add_argument('--lradj', type=str, default='type1', help='adjust learning rate')
-parser.add_argument('--use_amp', action='store_true', help='use automatic mixed precision training', default=False)
+parser.add_argument('--use_amp', action='store_true',
+                    help='use automatic mixed precision training', default=False)
 
 # GPU
 parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
