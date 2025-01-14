@@ -38,6 +38,8 @@ parser.add_argument('--log_file', type=str, default='logs/test.log',
                     help='file path of log file for the training process')
 parser.add_argument('--do_predict', action='store_true',
                     help='whether to predict unseen future data')
+parser.add_argument('--rerun', action='store_true', default=False,
+                    help='whether to cover existing test results')
 
 # data loader
 parser.add_argument('--data', type=str, required=True, help='dataset type')
@@ -158,7 +160,7 @@ if args.is_training:
 
         # skip if already tested
         result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
-        if os.path.exists(result_path):
+        if os.path.exists(result_path) and not args.rerun:
             logger.log(
                 "Experiment result found in test_results, skipping...",
                 console_only=True)
@@ -191,7 +193,7 @@ else:
 
     # skip if already tested
     result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
-    if os.path.exists(result_path):
+    if os.path.exists(result_path) and not args.rerun:
         logger.log(
             "Experiment result found in test_results, skipping...",
             console_only=True)

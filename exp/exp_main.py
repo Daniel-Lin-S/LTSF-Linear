@@ -1,4 +1,5 @@
-from data_provider.data_factory import data_provider
+from data_provider.data_factory import data_provider, DataLoader
+from data_provider.data_loader import Dataset
 from exp.exp_basic import Exp_Basic
 from models import (
     Informer, Autoformer, Transformer,
@@ -6,7 +7,8 @@ from models import (
     STFTLinear
 )
 from utils.tools import (
-    EarlyStopping, adjust_learning_rate, visualise_results, test_params_flop
+    EarlyStopping, adjust_learning_rate, visualise_results,
+     test_params_flop, format_large_int
 )
 from utils.metrics import metric, decay_l2_loss
 from utils.logger import Logger
@@ -17,7 +19,7 @@ import torch
 import torch.nn as nn
 from torch import optim
 
-from typing import Optional
+from typing import Optional, Tuple
 from tqdm import tqdm
 import os
 import time
@@ -116,13 +118,20 @@ class Exp_Main(Exp_Basic):
 
         return model
 
-    def _get_data(self, flag):
+    def _get_data(self, flag) -> Tuple[Dataset, DataLoader]:
         data_set, data_loader = data_provider(self.args, flag, 'pred', self.logger)
         return data_set, data_loader
 
     def _select_optimizer(self):
         model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
         return model_optim
+    
+    def _get_model_size(self) -> str:
+        """ get the total number of trainable parameters """
+        n_params = sum(p.numel()
+                       for p in self.model.parameters()
+                       if p.requires_grad)
+        return format_large_int(n_params)
 
     def _get_loss(self) -> callable:
         """
@@ -481,7 +490,7 @@ class Exp_Main(Exp_Basic):
     def _save_results(self, setting, preds, trues, inputx,
                       save_all=False) -> None:
         """
-        Calculate the metrics and save them to results.txt
+        Calculate the metrics and save them to result.txt
         file, and print MSE, MAE.
 
         Parameters
@@ -515,6 +524,7 @@ class Exp_Main(Exp_Basic):
         # write metrics into a txt file
         f = open("result.txt", 'a')
         f.write(setting + "  \n")
+        f.write(f'Model size {self._get_model_size()}' + "  \n")
         f.write('mse:{}, mae:{}, rse:{}, mape:{}'.format(
             metrics['mse'], metrics['mae'], metrics['rse'], metrics['mape']))
         f.write('\n')
