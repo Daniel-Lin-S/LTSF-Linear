@@ -297,6 +297,19 @@ class Exp_Latent_Pred(Exp_Main, ABC):
         """
         dataset, data_loader = data_provider(self.args, flag, 'pred')
         return dataset, data_loader
+    
+    def _get_model_size(self) -> str:
+        model_l_size = sum(p.numel()
+                           for p in self.model_l.parameters()
+                           if p.requires_grad)
+        model_h_size = sum(p.numel()
+                           for p in self.model_h.parameters()
+                           if p.requires_grad)
+        pretrained_size = sum(p.numel()
+                           for p in self.pretrained_model.parameters()
+                           if p.requires_grad)
+        return f'{model_l_size + model_h_size}, ' \
+            'reconstructor {pretrained_size}'
 
     def train(self, setting: str,
               log_interval: int=50) -> None:
