@@ -13,7 +13,7 @@ repeat=3
 gpu_id=0
 for model_name in FDLinear STFTLinear
 do 
-for pred_len in 96 192 336 720
+for pred_len in 96 192 336 729
 do
 for nfft in 8 16 32
 do
