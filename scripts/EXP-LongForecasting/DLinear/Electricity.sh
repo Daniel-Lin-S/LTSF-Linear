@@ -1,29 +1,22 @@
-#!/bin/bash
-
 if [ ! -d "./logs" ]; then
     mkdir ./logs
 fi
 
-if [ ! -d "./logs/STFT" ]; then
-    mkdir ./logs/STFT
+if [ ! -d "./logs/LongForecasting" ]; then
+    mkdir ./logs/LongForecasting
 fi
-
 seq_len=336
+model_name=DLinear
 repeat=3
 gpu_id=0
-for model_name in FDLinear STFTLinear
-do 
 for pred_len in 96 192 336 720
-do
-for nfft in 8 16 32
 do
 python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/electricity/ \
   --data_path electricity.csv \
-  --model_id Electricity_$seq_len'_'$pred_len'_nfft'$nfft \
+  --model_id Electricity_$seq_len'_'$pred_len \
   --model $model_name \
-  --nfft $nfft \
   --data custom \
   --features M \
   --seq_len $seq_len \
@@ -31,9 +24,5 @@ python -u run_longExp.py \
   --enc_in 321 \
   --des 'Exp' \
   --gpu $gpu_id \
-  --itr $repeat --batch_size 16 \
-  --learning_rate 0.005 --individual \
-  --log_file logs/STFT/$model_name'_I_'electricity_$seq_len'_'$pred_len.log 
-done
-done
+  --itr $repeat --batch_size 16  --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'electricity_$seq_len'_'$pred_len.log 
 done

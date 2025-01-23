@@ -9,7 +9,7 @@ seq_len=336
 model_recon=VAE
 model_pred=NLinear
 repeat=3
-for pred_len in 96 192 336 729
+for pred_len in 96 192 336 720
 do
 python -u run_reconExp.py \
   --is_training 2 \
