@@ -11,14 +11,14 @@ repeat=3
 gpu_id=0
 for pred_len in 96 192 336 720; do
   for individual in True False; do
-    model_id="Exchange_${seq_len}_${pred_len}_ind${individual}"
-    log_file="logs/LongForecasting/${model_name}_exchange_${seq_len}_${pred_len}.log"
+    model_id="Traffic_${seq_len}_${pred_len}_ind${individual}"
+    log_file="logs/LongForecasting/${model_name}_traffic_${seq_len}_${pred_len}.log"
     command="python -u run_longExp.py \
-    --root_path ./dataset/exchange_rate/ \
-    --data_path exchange_rate.csv \
+    --root_path ./dataset/traffic/ \
+    --data_path traffic.csv \
     --data custom \
-    --enc_in 8 \
-    --batch_size 8 \
+    --enc_in 862 \
+    --batch_size 16 \
     --learning_rate 0.005 \
     --model_id $model_id \
     --model $model_name \

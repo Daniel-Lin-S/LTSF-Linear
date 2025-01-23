@@ -6,7 +6,7 @@ if [ ! -d "./logs/LongForecasting" ]; then
     mkdir ./logs/LongForecasting
 fi
 seq_len=336
-model_name=NLinear
+model_name=DLinear
 repeat=3
 gpu_id=0
 for pred_len in 96 192 336 720
@@ -24,7 +24,9 @@ python -u run_longExp.py \
   --enc_in 321 \
   --des 'Exp' \
   --gpu $gpu_id \
-  --itr $repeat --batch_size 16  --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'electricity_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 16  --learning_rate 0.005 --individual \
+  --log_file logs/LongForecasting/$model_name'_I_'electricity_$seq_len'_'$pred_len.log \
+  --result_file DLinear_result.txt
 
 python -u run_longExp.py \
   --is_training 1 \
@@ -39,7 +41,9 @@ python -u run_longExp.py \
   --enc_in 862 \
   --des 'Exp' \
   --gpu $gpu_id \
-  --itr $repeat --batch_size 16 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'traffic_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 16 --learning_rate 0.005 --individual \
+  --log_file logs/LongForecasting/$model_name'_I_'traffic_$seq_len'_'$pred_len.log \
+  --result_file DLinear_result.txt
 
 python -u run_longExp.py \
   --is_training 1 \
@@ -54,7 +58,9 @@ python -u run_longExp.py \
   --enc_in 21 \
   --des 'Exp' \
   --gpu $gpu_id \
-  --itr $repeat --batch_size 16 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'weather_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 16 --learning_rate 0.005 --individual \
+  --log_file logs/LongForecasting/$model_name'_I_'weather_$seq_len'_'$pred_len.log \
+  --result_file DLinear_result.txt
 
 python -u run_longExp.py \
   --is_training 1 \
@@ -69,7 +75,9 @@ python -u run_longExp.py \
   --enc_in 8 \
   --des 'Exp' \
   --gpu $gpu_id \
-  --itr $repeat --batch_size 8 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'exchange_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 8 --learning_rate 0.005 --individual \
+  --log_file logs/LongForecasting/$model_name'_I_'exchange_$seq_len'_'$pred_len.log \
+  --result_file DLinear_result.txt
 
 python -u run_longExp.py \
   --is_training 1 \
@@ -84,7 +92,9 @@ python -u run_longExp.py \
   --enc_in 7 \
   --des 'Exp' \
   --gpu $gpu_id \
-  --itr $repeat --batch_size 32 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'ETTh1_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 32 --learning_rate 0.005 --individual \
+  --log_file logs/LongForecasting/$model_name'_I_'ETTh1_$seq_len'_'$pred_len.log \
+  --result_file DLinear_result.txt
 
 # if pred_len=336, lr=0.001; if pred_len=720, lr=0.0001
 python -u run_longExp.py \
@@ -100,7 +110,9 @@ python -u run_longExp.py \
   --enc_in 7 \
   --des 'Exp' \
   --gpu $gpu_id \
-  --itr $repeat --batch_size 32 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'ETTh2_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 32 --learning_rate 0.005 --individual \
+  --log_file logs/LongForecasting/$model_name'_I_'ETTh2_$seq_len'_'$pred_len.log \
+  --result_file DLinear_result.txt
 
 # if pred_len=336, lr=0.005; if pred_len=720, lr=0.0005
 python -u run_longExp.py \
@@ -116,7 +128,9 @@ python -u run_longExp.py \
   --enc_in 7 \
   --des 'Exp' \
   --gpu $gpu_id \
-  --itr $repeat --batch_size 8 --learning_rate 0.005 --individual >logs/LongForecasting/$model_name'_I_'ETTm1_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 8 --learning_rate 0.005 --individual \
+  --log_file logs/LongForecasting/$model_name'_I_'ETTm1_$seq_len'_'$pred_len.log \
+  --result_file DLinear_result.txt
 
 python -u run_longExp.py \
   --is_training 1 \
@@ -131,7 +145,9 @@ python -u run_longExp.py \
   --enc_in 7 \
   --des 'Exp' \
   --gpu $gpu_id \
-  --itr $repeat --batch_size 32 --learning_rate 0.01 --individual >logs/LongForecasting/$model_name'_I_'ETTm2_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 32 --learning_rate 0.01 --individual \
+  --log_file logs/LongForecasting/$model_name'_I_'ETTm2_$seq_len'_'$pred_len.log  \
+  --result_file DLinear_result.txt
 done
 
 seq_len=104
@@ -151,6 +167,8 @@ python -u run_longExp.py \
   --enc_in 7 \
   --des 'Exp' \
   --gpu $gpu_id \
-  --itr $repeat --batch_size 32 --learning_rate 0.01 --individual >logs/LongForecasting/$model_name'_I_'ILI_$seq_len'_'$pred_len.log 
+  --itr $repeat --batch_size 32 --learning_rate 0.01 --individual \
+  --log_file logs/LongForecasting/$model_name'_I_'ILI_$seq_len'_'$pred_len.log \
+  --result_file DLinear_result.txt
 done
 
