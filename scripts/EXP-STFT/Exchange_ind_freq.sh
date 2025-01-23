@@ -11,7 +11,7 @@ fi
 repeat=3
 gpu_id=0
 for pred_len in 96 192 336 720; do
-for nfft in 4 8 16 32; do
+for nfft in 4 8 16 32 64; do
     model_id="Exchange_336_${pred_len}_nfft${nfft}"
     log_file="logs/STFT/${model_name}_I_exchange_336_${pred_len}.log"
     python -u run_longExp.py \
