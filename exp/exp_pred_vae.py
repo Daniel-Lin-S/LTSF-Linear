@@ -53,11 +53,10 @@ class Exp_VAE2D_Pred(Exp_Latent_Pred):
                     # (batch_size, w, latent_dim)
                     pass
                 else:
-                    self.logger.log(
+                    raise ValueError(
                         f"Unknown latent_type: {self.pretrained_model.latent_type}",
                         level='error'
                     )
-                    raise
 
                 # Concatenate means and log variances along the feature dimension
                 lf_latent_segment = torch.cat([mu_l, log_var_l], dim=-1)

@@ -107,13 +107,11 @@ class Exp_Latent_Pred(Exp_Main, ABC):
         }
         args = self.args
         if args.model_recon not in model_dict:
-            self.logger.log(
+            raise ValueError(
                 f"Invalid reconstruction model name '{args.model_recon}'. "
                 "Available models are: "
-                + ", ".join(model_dict.keys()),
-                level='error'
+                + ", ".join(model_dict.keys())
             )
-            raise
 
         recon_len = gcd(self.args.seq_len, self.args.pred_len)
         self.args.recon_len = recon_len
@@ -127,13 +125,11 @@ class Exp_Latent_Pred(Exp_Main, ABC):
             self.pretrained_model.load_state_dict(
                 torch.load(model_path))
         except FileNotFoundError:
-            self.logger.log(
+            raise FileNotFoundError(
                 f'Cannot find VAE checkpoint in {model_path}'
                 ', please train the VAE model before '
-                'running prediction experiment.',
-                level='error'
+                'running prediction experiment.'
             )
-            raise
 
         if self.args.use_multi_gpu and self.args.use_gpu:
             self.pretrained_model = nn.DataParallel(
@@ -240,12 +236,10 @@ class Exp_Latent_Pred(Exp_Main, ABC):
             List of segmented tensors.
         """
         if x.shape[1] % seq_len != 0:
-            self.logger.log(
+            raise ValueError(
                 f'temporal length of x, {x.shape[1]} '
-                f'must be divisible by seq_len {seq_len}',
-                level='error'
+                f'must be divisible by seq_len {seq_len}'
             )
-            raise
         segments = [x[:, i:i+seq_len, :] for i in range(0, x.size(1), seq_len)]
         return segments
     
@@ -278,14 +272,10 @@ class Exp_Latent_Pred(Exp_Main, ABC):
                 true_seq, pred_seq = self._extract_prediction(batch_y, pred_seq)
                 loss = criterion(true_seq, pred_seq)
                 if torch.isinf(loss):
-                    self.logger.log(
-                        'Loss overflow to inf', level='error')
-                    raise
+                    raise RuntimeError('Loss overflow to inf')
                 elif torch.isnan(loss):
-                    self.logger.log(
-                        'Nan values produced during training',
-                        level='error')
-                    raise
+                    raise RuntimeError(
+                        'Nan values produced during training')
 
                 return loss
         else:
@@ -516,13 +506,11 @@ class Exp_Latent_Pred(Exp_Main, ABC):
                 self.model_h.load_state_dict(
                     torch.load(model_path_h))
             except FileNotFoundError:
-                error_msg = (
+                raise FileNotFoundError(
                     "Cannot find model checkpoints 'pred_lf.pth' and"
                     " 'pred_hf.pth'. Please train the models"
                     ' before testing.'
                 )
-                self.logger.log(error_msg, 'error')
-                raise
 
         preds = []
         trues = []

@@ -91,12 +91,11 @@ class Exp_Recon(Exp_Basic):
 
         args = self.args
         if args.model not in model_dict:
-            self.logger.log(
+            raise ValueError(
                 f"Invalid model name '{args.model}'. Available models are: "
                 + ", ".join(model_dict.keys()),
                 level='error'
             )
-            raise
 
         recon_len = gcd(self.args.seq_len, self.args.pred_len)
         args.recon_len = recon_len
@@ -221,21 +220,18 @@ class Exp_Recon(Exp_Basic):
                 try:
                     loss = loss_dict['total']
                 except KeyError:
-                    self.logger.log(
-                        'KeyError: The loss dictionary must include a key "total", '
+                    raise KeyError(
+                        'The loss dictionary must include a key "total", '
                         'indicating the overall loss. '
                         'Please ensure model.forward returns '
                         'a properly formatted loss dictionary.',
                         level="error"
                     )
-                    raise
 
                 if torch.isnan(loss):
-                    self.logger.log(
-                        'Loss becomes NaN while training, stopping the process...',
-                        level='error'
+                    raise RuntimeError(
+                        'Loss becomes NaN while training'
                     )
-                    raise
 
                 train_loss.append(loss.item())
                 loss.backward()
@@ -361,9 +357,7 @@ class Exp_Recon(Exp_Basic):
             except AttributeError:
                 for key, item in loss_dict.items():
                     print(f'key {key}, type {type(item)}')
-                self.logger.log('Values of loss_dict should be torch Tensors',
-                                level='error')
-                raise
+                raise ValueError('Values of loss_dict should be torch Tensors')
             self.logger.log(loss_message, level='debug')
 
         total_loss = np.average(total_loss)

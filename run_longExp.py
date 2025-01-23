@@ -167,25 +167,45 @@ if args.is_training:
             continue
 
         # Training Stage
-        exp = Exp_Main(args, logger)
+        stage_name = f'{args.model_id} Experiment Initialisation'
+        try:
+            exp = Exp_Main(args, logger)
+        except Exception as e:
+            logger.stage_failed(e, stage_name)
+            torch.cuda.empty_cache()
+            continue
+
         stage_name = f'{args.model_id} Predictor Training_{ii}'
-        logger.start_stage(stage_name, setting)
-        exp.train(setting)
-        logger.finish_stage(stage_name)
+        logger.stage_start(stage_name, setting)
+        try:
+            exp.train(setting)
+            logger.stage_end(stage_name)
+        except Exception as e:
+            logger.stage_failed(e, stage_name)
+            torch.cuda.empty_cache()
+            continue
 
         # Testing Stage
         if not args.train_only:
             stage_name = f'{args.model_id} Testing_{ii}'
-            logger.start_stage(stage_name, setting)
-            exp.test(setting)
-            logger.finish_stage(stage_name)
+            logger.stage_start(stage_name, setting)
+            try:
+                exp.test(setting)
+                logger.stage_end(stage_name)
+            except Exception as e:
+                logger.stage_failed(e, stage_name)
+                torch.cuda.empty_cache()
+                continue
 
         # Prediction Stage
         if args.do_predict:
             stage_name = f'{args.model_id} Prediction_{ii}'
-            logger.start_stage(stage_name, setting)
-            exp.predict(setting, True)
-            logger.finish_stage(stage_name)
+            logger.stage_start(stage_name, setting)
+            try:
+                exp.predict(setting)
+                logger.stage_end(stage_name)
+            except Exception as e:
+                logger.stage_failed(e, stage_name)
 
         torch.cuda.empty_cache()
 else:
@@ -199,16 +219,28 @@ else:
             console_only=True)
         sys.exit()
 
-    exp = Exp_Main(args, logger)
+    stage_name = f'{args.model_id} Experiment Initialisation'
+    try:
+        exp = Exp_Main(args, logger)
+    except Exception as e:
+        logger.stage_failed(e, stage_name)
+        torch.cuda.empty_cache()
+        sys.exit()
 
     if args.do_predict:  # Prediction Stage
         stage_name = f'{args.model_id} Prediction'
-        logger.start_stage(stage_name, setting)
-        exp.predict(base_setting, True)
-        logger.finish_stage(stage_name)
+        logger.stage_start(stage_name, setting)
+        try:
+            exp.predict(setting)
+            logger.stage_end(stage_name)
+        except Exception as e:
+            logger.stage_failed(e, stage_name)
     else:  # Test Stage
         stage_name = f'{args.model_id} Testing'
-        logger.start_stage(stage_name, setting)
-        exp.test(base_setting, test=1)
-        logger.finish_stage(stage_name)
+        logger.stage_start(stage_name, setting)
+        try:
+            exp.test(setting)
+            logger.stage_end(stage_name)
+        except Exception as e:
+            logger.stage_failed(e, stage_name)
     torch.cuda.empty_cache()

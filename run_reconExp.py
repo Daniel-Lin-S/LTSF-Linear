@@ -203,11 +203,22 @@ if args.is_training > 0:
         logger.log(f'Random seed: {seed}', level='debug')
 
         if args.is_training > 1:
+            stage_name = f'{args.model_id} Reconstruction Experiment Initialisation'
+            try:
+                exp_recon = Exp_Recon(args_recon, config, logger)
+            except Exception as e:
+                logger.stage_failed(e, stage_name)
+                torch.cuda.empty_cache()
+                continue
             stage_name = f'{args.model_id} Reconstructor Training_{ii}'
-            exp_recon = Exp_Recon(args_recon, config, logger)
-            logger.start_stage(stage_name, setting)
-            exp_recon.train(setting)
-            logger.finish_stage(stage_name)
+            logger.stage_start(stage_name, setting)
+            try:
+                exp_recon.train(setting)
+                logger.stage_end(stage_name)
+            except Exception as e:
+                logger.stage_failed(e, stage_name)
+                torch.cuda.empty_cache()
+                continue
 
         model_path = os.path.join(
             args.checkpoints, setting, 'reconstructor.pth')
@@ -216,17 +227,32 @@ if args.is_training > 0:
             # TODO - design VQVAE predictor or remove this
             if args.model_recon == 'VQVAE':
                 raise NotImplementedError
+            stage_name = f'{args.model_id} Prediction Experiment Initialisation'
+            try:
+                exp_pred = Exp_pred(args_pred, model_path, config, logger)
+            except Exception as e:
+                logger.stage_failed(e, stage_name)
+                torch.cuda.empty_cache()
+                continue
+
             stage_name = f'{args.model_id} Latent Predictor Training_{ii}'
-            logger.start_stage(stage_name, setting)
-            exp_pred = Exp_pred(args_pred, model_path, config, logger)
-            exp_pred.train(setting)
-            logger.finish_stage(stage_name)
+            logger.stage_start(stage_name, setting)
+            try:
+                exp_pred.train(setting)
+                logger.stage_end(stage_name)
+            except Exception as e:
+                logger.stage_failed(e, stage_name)
+                torch.cuda.empty_cache()
+                continue
 
             if not args.train_only:
                 stage_name = f'{args.model_id} Latent Predictor Testing_{ii}'
-                logger.start_stage(stage_name, setting)
-                exp_pred.test(setting)
-                logger.finish_stage(stage_name)
+                logger.stage_start(stage_name, setting)
+                try:
+                    exp_pred.test(setting)
+                    logger.stage_end(stage_name)
+                except Exception as e:
+                    logger.stage_failed(e, stage_name)
 
         torch.cuda.empty_cache()
 else:
@@ -243,11 +269,21 @@ else:
     # path to the reconstruction model
     model_path = os.path.join(
         args.checkpoints, setting, 'reconstructor.pth')
-    exp_pred = Exp_pred(args_pred, model_path, config, logger)
+
+    stage_name = f'{args.model_id} Prediction Experiment Initialisation'
+    try:
+        exp_pred = Exp_pred(args_pred, model_path, config, logger)
+    except Exception as e:
+        logger.stage_failed(e, stage_name)
+        torch.cuda.empty_cache()
+        sys.exit()
 
     stage_name = f'{args.model_id} Latent Predictor Testing'
-    logger.start_stage(stage_name, setting)
-    exp_pred.test(setting, test=1)
-    logger.finish_stage(stage_name)
+    logger.stage_start(stage_name, setting)
+    try:
+        exp_pred.test(setting)
+        logger.stage_end(stage_name)
+    except Exception as e:
+        logger.stage_failed(e, stage_name)
 
     torch.cuda.empty_cache()

@@ -102,12 +102,9 @@ class Exp_Main(Exp_Basic):
                 "Available models are: "
                 + ", ".join(model_dict.keys()))
             
-            if self.logger:
-                self.logger.log(error_message, 'error')
-            else:
-                raise ValueError(
-                    error_message
-                )
+            raise ValueError(
+                error_message
+            )
 
         model = model_dict[args.model].Model(args).float()
 
@@ -440,11 +437,7 @@ class Exp_Main(Exp_Basic):
                     'Cannot find model checkpoint, please train the model'
                     ' before testing.'
                 )
-                if self.logger:
-                    self.logger.log(error_msg, 'error')
-                    raise
-                else:
-                    raise Exception(error_msg)
+                raise FileNotFoundError(error_msg)
 
         preds = []
         trues = []
@@ -562,11 +555,7 @@ class Exp_Main(Exp_Basic):
                     'Cannot find model checkpoint, please train the model'
                     ' before running predict function.'
                 )
-                if self.logger:
-                    self.logger.log(error_msg, 'error')
-                    raise
-                else:
-                    raise Exception(error_msg)
+                raise FileNotFoundError(error_msg)
 
         preds = []
 
