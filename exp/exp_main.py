@@ -485,11 +485,15 @@ class Exp_Main(Exp_Basic):
             test_params_flop((batch_x.shape[1],batch_x.shape[2]))
             exit()
 
-        self._save_results(setting, preds, trues, inputx)
+        self._save_results(setting, preds, trues, inputx,
+                           output_file=self.args.result_file)
 
         return
 
-    def _save_results(self, setting, preds, trues, inputx,
+    def _save_results(self, setting: str,
+                      preds: torch.Tensor, trues: torch.Tensor,
+                      inputx: torch.Tensor,
+                      output_file: str='result.txt',
                       save_all=False) -> None:
         """
         Calculate the metrics and save them to result.txt
@@ -504,6 +508,10 @@ class Exp_Main(Exp_Basic):
         inputx : torch.Tensor
             the input series used to produce the
             predicted values
+        output_file : str
+            Path to the txt file in which
+            the metrics will be stored.
+            Default is 'result.txt'
         save_all : bool, optional
             if True, save the preds, trues, inputx
             and all metrics as numpy value files.
@@ -524,14 +532,14 @@ class Exp_Main(Exp_Basic):
             print(metric_msg)
 
         # write metrics into a txt file
-        f = open("result.txt", 'a')
+        f = open(output_file, 'a')
         f.write(setting + "  \n")
         f.write(f'Model size {self._get_model_size()}' + "  \n")
         f.write('mse:{}, mae:{}, rse:{}, mape:{}'.format(
             metrics['mse'], metrics['mae'], metrics['rse'], metrics['mape']))
         f.write('\n')
         f.write('\n')
-        self.logger.log('metrics saved to result.txt', level='debug')
+        self.logger.log('metrics saved to output_file', level='debug')
 
         if save_all:
             folder_path = './results/' + setting + '/'

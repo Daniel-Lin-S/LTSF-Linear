@@ -33,7 +33,8 @@ python -u run_longExp.py \
   --gpu $gpu_id \
   --itr $repeat --batch_size 8 \
   --learning_rate 0.005 --individual \
-  --log_file logs/STFT/$model_name'_I_'exchange_$seq_len'_'$pred_len.log 
+  --log_file logs/STFT/$model_name'_I_'exchange_$seq_len'_'$pred_len.log \
+  --result_file result_exchange_stft.txt
 done
 done
 done

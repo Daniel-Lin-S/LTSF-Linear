@@ -36,6 +36,8 @@ parser.add_argument('--des', type=str, default='',
                     help='experiment description added at the end of folder name')
 parser.add_argument('--log_file', type=str, default='logs/test.log',
                     help='file path of log file for the training process')
+parser.add_argument('--result_file', type=str, default='result.txt',
+                    help='file path of the txt file to store the evaluation results')
 parser.add_argument('--do_predict', action='store_true',
                     help='whether to predict unseen future data')
 parser.add_argument('--rerun', action='store_true', default=False,

@@ -1,7 +1,7 @@
 *.pyc
 *.pth
 dataset/
-result.txt
+result*.txt
 test_results/
 results/
 logs/

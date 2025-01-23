@@ -34,7 +34,8 @@ for independent_freqs in False True; do
         --learning_rate 0.005 \
         --nfft 4 \
         --stft_hop_length 2 \
-        --log_file $log_file"
+        --log_file $log_file \
+        --result_file result_exchange_stft.txt"
 
     if [ "$individual" = "True" ]; then
         COMMAND="$COMMAND --individual"
