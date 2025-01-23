@@ -74,8 +74,14 @@ def get_pred_model_settings(args: argparse.Namespace) -> str:
         base_model_setting = 'ind{}'.format(
             args.individual
         )
-        if args.model == 'FDLinear' or args.model == 'STFTLinear':
+        if args.model == 'FDLinear':
             additional_setting = 'nfft{}_hl{}'.format(
+                args.nfft,
+                args.stft_hop_length
+            )
+        elif args.model == 'STFTLinear':
+            additional_setting = 'freqind{}_nfft{}_hl{}'.format(
+                args.independent_freqs,
                 args.nfft,
                 args.stft_hop_length
             )

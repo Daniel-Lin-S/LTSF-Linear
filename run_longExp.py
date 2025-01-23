@@ -71,8 +71,11 @@ parser.add_argument('--individual', action='store_true', default=False,
 
 # FDLinear and STFTLinear
 parser.add_argument('--stft_hop_length', type=int, default=4,
-                    help='FDLinear: hop length of sliding window for STFT')
-parser.add_argument('--nfft', type=int, default=8, help='FDLinear: number of FFT points')
+                    help='Hop length of sliding window for STFT')
+parser.add_argument('--nfft', type=int, default=8, help='Number of FFT points')
+parser.add_argument('--independent_freqs', action='store_true', default=False,
+                    help='For STFTLinear: whether to use separate linear models'
+                     ' for each frequency component.')
 
 # Formers 
 parser.add_argument('--embed_type', type=int, default=0,
