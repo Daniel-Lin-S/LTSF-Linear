@@ -205,6 +205,16 @@ class Exp_Main(Exp_Basic):
             else:
                 outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
+        if outputs.shape[1] != self.args.pred_len:
+            error_msg = (
+                f'The temporal length of model output: {outputs.shape[1]}'
+                f', does not match prediction length {self.args.pred_len}'
+            )
+            self.logger.log(error_msg, 'error')
+            raise RuntimeError(
+                error_msg
+            )
+
         return outputs
     
     def _prepare_decoder_input(self, batch_y):
@@ -318,7 +328,6 @@ class Exp_Main(Exp_Basic):
                     outputs = self._get_output(
                             batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                    # print(outputs.shape,batch_y.shape)
                     loss = self._compute_pred_loss(criterion, batch_y, outputs)
                     train_loss.append(loss.item())
                 

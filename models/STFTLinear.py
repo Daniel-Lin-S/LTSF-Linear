@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.functional import F
 from utils.time_freq import (
     time_to_timefreq, timefreq_to_time, zero_pad_high_freq, zero_pad_low_freq
 )
@@ -113,10 +114,11 @@ class Model(nn.Module):
                                stft_kwargs={'hop_length': self.hop_length})
         x_h = timefreq_to_time(u_h_pred, self.nfft, C,
                                stft_kwargs={'hop_length': self.hop_length})
+        # compensate for reduction in length
+        x_l = F.interpolate(x_l, self.pred_len, mode='linear')
+        x_h = F.interpolate(x_h, self.pred_len, mode='linear')
 
-        # Combine low and high frequency components
-        x = x_l + x_h
-        return rearrange(x, 'b c l -> b l c')
+        return rearrange(x_l + x_h, 'b c l -> b l c')
 
     def _get_latent_length(self) -> Tuple[int, int]:
         """
@@ -141,7 +143,7 @@ class Model(nn.Module):
         time_freq_data = time_to_timefreq(
             fake_data, self.nfft, self.in_channels,
             stft_kwargs={'hop_length': self.hop_length})
-
+        
         latent_length_pred = time_freq_data.size(3)
         
         return latent_length_input, latent_length_pred
