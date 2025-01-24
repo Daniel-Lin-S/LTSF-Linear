@@ -1,4 +1,4 @@
-model_name=DLinear
+model_name=DLinear   # Linear NLinear STFTLinear FDLinear
 
 for pred_len in 24 720
 do
@@ -16,7 +16,9 @@ do
     --pred_len $pred_len  \
     --enc_in 321 \
     --des 'Exp' \
-    --itr 1 --batch_size 16  --learning_rate 0.001 >logs/LookBackWindow/$model_name'_'electricity_$seq_len'_'$pred_len.log
+    --itr 1 --batch_size 16  --learning_rate 0.001 \
+    --log_file logs/LookBackWindow/$model_name'_'electricity_$seq_len'_'$pred_len.log \
+    --result_file "${model_name}_result.txt"
 
   python -u run_longExp.py \
     --is_training 1 \
@@ -30,7 +32,9 @@ do
     --pred_len $pred_len  \
     --enc_in 7 \
     --des 'Exp' \
-    --itr 1 --batch_size 8 >logs/LookBackWindow/$model_name'_'ETTh1_$seq_len'_'$pred_len.log
+    --itr 1 --batch_size 8 \
+    --log_file logs/LookBackWindow/$model_name'_'ETTh1_$seq_len'_'$pred_len.log \
+    --result_file "${model_name}_result.txt"
 
   python -u run_longExp.py \
   --is_training 1 \
@@ -46,7 +50,9 @@ do
   --dec_in 7 \
   --c_out 7 \
   --des 'Exp' \
-  --itr 1 --batch_size 32 --learning_rate 0.05 >logs/LookBackWindow/$model_name'_'Etth2_$seq_len'_'$pred_len.log
+  --itr 1 --batch_size 32 --learning_rate 0.05 \
+  --log_file logs/LookBackWindow/$model_name'_'Etth2_$seq_len'_'$pred_len.log \
+  --result_file "${model_name}_result.txt"
 
   python -u run_longExp.py \
   --is_training 1 \
@@ -60,7 +66,9 @@ do
   --pred_len $pred_len  \
   --enc_in 8 \
   --des 'Exp' \
-  --itr 1 --batch_size 32 --learning_rate 0.005 >logs/LookBackWindow/$model_name'_'exchange_rate_$seq_len'_'$pred_len.log
+  --itr 1 --batch_size 32 --learning_rate 0.005 \
+  --log_file logs/LookBackWindow/$model_name'_'exchange_rate_$seq_len'_'$pred_len.log \
+  --result_file "${model_name}_result.txt"
 
   python -u run_longExp.py \
   --is_training 1 \
@@ -74,7 +82,9 @@ do
   --pred_len $pred_len  \
   --enc_in 862 \
   --des 'Exp' \
-  --itr 1 --batch_size 16 --learning_rate 0.05 >logs/LookBackWindow/$model_name'_'traffic_$seq_len'_'$pred_len.log
+  --itr 1 --batch_size 16 --learning_rate 0.05 \
+  --log_file logs/LookBackWindow/$model_name'_'traffic_$seq_len'_'$pred_len.log \
+  --result_file "${model_name}_result.txt"
 
   python -u run_longExp.py \
   --is_training 1 \
@@ -88,7 +98,9 @@ do
   --pred_len $pred_len  \
   --enc_in 21 \
   --des 'Exp' \
-  --itr 1 --batch_size 16 >logs/LookBackWindow/$model_name'_'weather_$seq_len'_'$pred_len.log
+  --itr 1 --batch_size 16 \
+  --log_file logs/LookBackWindow/$model_name'_'weather_$seq_len'_'$pred_len.log \
+  --result_file "${model_name}_result.txt"
 done
 done
 
@@ -108,7 +120,9 @@ do
   --pred_len $pred_len  \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 1 --batch_size 8 --learning_rate 0.0001 >logs/LookBackWindow/$model_name'_'Ettm1_$seq_len'_'$pred_len.log
+  --itr 1 --batch_size 8 --learning_rate 0.0001 \
+  --log_file logs/LookBackWindow/$model_name'_'Ettm1_$seq_len'_'$pred_len.log \
+  --result_file "${model_name}_result.txt"
 
   python -u run_longExp.py \
   --is_training 1 \
@@ -122,7 +136,9 @@ do
   --pred_len $pred_len  \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 1 --batch_size 32 --learning_rate 0.05 >logs/LookBackWindow/$model_name'_'Ettm2_$seq_len'_'$pred_len.log
+  --itr 1 --batch_size 32 --learning_rate 0.05 \
+  --log_file logs/LookBackWindow/$model_name'_'Ettm2_$seq_len'_'$pred_len.log \
+  --result_file "${model_name}_result.txt"
 done
 done
 
@@ -143,6 +159,8 @@ do
   --pred_len $pred_len  \
   --enc_in 7 \
   --des 'Exp' \
-  --itr 1 --batch_size 32 --learning_rate 0.05 >logs/LookBackWindow/$model_name'_'ili_$seq_len'_'$pred_len.log
+  --itr 1 --batch_size 32 --learning_rate 0.05 \
+  --log_file logs/LookBackWindow/$model_name'_'ili_$seq_len'_'$pred_len.log \
+  --result_file "${model_name}_result.txt"
 done
 done
