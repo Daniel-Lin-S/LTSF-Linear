@@ -2,6 +2,7 @@ import argparse
 import torch
 import random
 import numpy as np
+import pandas as pd
 import os
 import sys
 
@@ -43,6 +44,8 @@ parser.add_argument('--test_idx', type=int, default=0,
                     ' if is_training = 0')
 parser.add_argument('--des', type=str, default='',
                     help='experiment description added at the end of folder name')
+parser.add_argument('--result_file', type=str, default='result.csv',
+                    help='file path of the csv file to store the evaluation results')
 parser.add_argument('--log_file', type=str, default='logs/test.log',
                     help='file path of log file for the training process')
 parser.add_argument('--rerun', action='store_true', default=False,
@@ -173,6 +176,8 @@ base_setting = get_base_settings(args)
 recon_model_setting = get_recon_model_settings(args, config)
 pred_model_setting = get_pred_model_settings(args)
 model_setting = f'{pred_model_setting}_{recon_model_setting}'
+model_id = (f'{args.model_recon}_{recon_model_setting}_'
+                 f'{args.model_pred}_{pred_model_setting}')
 
 ### Set specific latent prediction experiment ###
 if args.model_recon == 'AE':
@@ -193,13 +198,18 @@ if args.is_training > 0:
         setting = f'{base_setting}_{model_setting}_{args.des}_{ii}'
 
         # skip if already tested
-        result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
-        if os.path.exists(result_path) and not args.rerun:
-            logger.log(
-                "Experiment result found in test_results, skipping...",
-                console_only=True)
-            continue
+        if os.path.exists(args.result_file):
+            df = pd.read_csv(args.result_file)
+            result_exists = (
+                (df['Model ID'] == model_id) & (df['Seed'] == seed)
+                ).any()
             
+            if result_exists and not args.rerun:
+                logger.log(
+                    "Experiment result found in test_results, skipping...",
+                    console_only=True)
+                continue
+
         logger.log(f'Random seed: {seed}', level='debug')
 
         if args.is_training > 1:
@@ -249,7 +259,9 @@ if args.is_training > 0:
                 stage_name = f'{args.exp_id} Latent Predictor Testing_{ii}'
                 logger.stage_start(stage_name, setting)
                 try:
-                    exp_pred.test(setting)
+                    exp_pred.test(
+                        setting, model_id, args.exp_id,
+                        exp_seed=seed)
                     logger.stage_end(stage_name)
                 except Exception as e:
                     logger.stage_failed(e, stage_name)
@@ -281,7 +293,10 @@ else:
     stage_name = f'{args.exp_id} Latent Predictor Testing'
     logger.stage_start(stage_name, setting)
     try:
-        exp_pred.test(setting)
+        exp_pred.test(
+            setting, model_id, args.exp_id,
+            exp_seed=iteration_seeds[args.test_idx],
+            load=True)
         logger.stage_end(stage_name)
     except Exception as e:
         logger.stage_failed(e, stage_name)

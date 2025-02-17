@@ -483,7 +483,9 @@ class Exp_Latent_Pred(Exp_Main, ABC):
             return np.mean(vali_loss)
 
 
-    def test(self, setting, test: int=0) -> None:
+    def test(self, setting: str, model_id: str,
+             exp_id: str, exp_seed: int,
+             load: bool=False) -> None:
         """
         Evaluate the model on the test set, report metrics, and save results.
 
@@ -491,13 +493,17 @@ class Exp_Latent_Pred(Exp_Main, ABC):
         ----------
         setting : str
             Identifier for the experiment (e.g., model configuration).
-        test : int, optional
-            If not 0, load the best checkpoint for evaluation.
-            Default is 0.
+        model_id : str
+            Identifier for the model.
+        exp_seed : int
+            Random seed used for the experiment.
+        load : bool, optional
+            If True, load the best checkpoint for evaluation. \n
+            Default is False.
         """
         _, test_loader = self._get_data(flag='test')
         
-        if test:
+        if load:
             model_path_l = os.path.join('./checkpoints/' + setting, 'pred_lf.pth')
             model_path_h = os.path.join('./checkpoints/' + setting, 'pred_hf.pth')
             try:
@@ -575,6 +581,8 @@ class Exp_Latent_Pred(Exp_Main, ABC):
             level='debug'
         )
 
-        self._save_results(setting, preds, trues, inputx)
+        self._save_results(
+            setting, model_id, exp_id, exp_seed, preds, trues, inputx,
+            output_file=self.args.result_file)
 
         return

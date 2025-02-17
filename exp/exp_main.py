@@ -24,8 +24,23 @@ from tqdm import tqdm
 import os
 import time
 import warnings
+import csv
+
 
 warnings.filterwarnings('ignore')
+
+# list of available available
+model_dict = {
+    'Autoformer': Autoformer,
+    'Transformer': Transformer,
+    'Informer': Informer,
+    'DLinear': DLinear,
+    'NLinear': NLinear,
+    'Linear': Linear,
+    'FDLinear': FDLinear,
+    'STFTLinear': STFTLinear
+}
+
 
 class Exp_Main(Exp_Basic):
     """
@@ -83,17 +98,6 @@ class Exp_Main(Exp_Basic):
         super(Exp_Main, self).__init__(args, logger)
 
     def _build_model(self, model_args=None):
-        model_dict = {
-            'Autoformer': Autoformer,
-            'Transformer': Transformer,
-            'Informer': Informer,
-            'DLinear': DLinear,
-            'NLinear': NLinear,
-            'Linear': Linear,
-            'FDLinear': FDLinear,
-            'STFTLinear': STFTLinear
-        }
-
         args = model_args if model_args is not None else self.args
 
         if args.model not in model_dict:
@@ -430,10 +434,34 @@ class Exp_Main(Exp_Basic):
         else:
             print(msg)
 
-    def test(self, setting: str, test: int=0):
+    def test(
+            self, setting: str, model_id: str, exp_id: str,
+            exp_seed: int, load: bool=False
+        ) -> None:
+        """
+        Test the model and save the results.
+
+        Parameters
+        ----------
+        setting : str
+            The identifier of this experiment.
+        model_id : str
+            The identifier of this model,
+            composing of model name and relevant hyperparameters.
+        exp_id : str
+            The identifier of this experiment,
+            with information like dataset name, prediction length,
+            input length etc.
+        exp_seed : int
+            The random seed used in the experiment.
+        load : bool, optional
+            if True, load the model from the checkpoint
+            to test the model. \n
+            Default is False.
+        """
         _, test_loader = self._get_data(flag='test')
         
-        if test:
+        if load:
             file_path = os.path.join('./checkpoints/' + setting, 'checkpoint.pth')
             try:
                 self.model.load_state_dict(
@@ -494,15 +522,17 @@ class Exp_Main(Exp_Basic):
             test_params_flop((batch_x.shape[1],batch_x.shape[2]))
             exit()
 
-        self._save_results(setting, preds, trues, inputx,
-                           output_file=self.args.result_file)
+        self._save_results(
+            setting, model_id, exp_id, exp_seed, preds, trues, inputx,
+            output_file=self.args.result_file)
 
         return
 
     def _save_results(self, setting: str, model_id: str,
+                      exp_id: str, exp_seed: int,
                       preds: torch.Tensor, trues: torch.Tensor,
                       inputx: torch.Tensor,
-                      output_file: str='result.txt',
+                      output_file: str='results.csv',
                       save_all=False) -> None:
         """
         Calculate the metrics and save them to result.txt
@@ -511,10 +541,17 @@ class Exp_Main(Exp_Basic):
         Parameters
         ----------
         setting : str
-            The identifier of this experiment.
+            The full experimenting settings used to name the folder
+            in which the results will be saved when save_all=True
         model_id : str
             The identifier of this model,
             composing of model name and relevant hyperparameters.
+        exp_id : str
+            The identifier of this experiment,
+            with information like dataset name, prediction length,
+            input length etc.
+        exp_seed : int
+            The random seed used in the experiment.
         preds, trues : torch.Tensor
             the predicted values and ground truth,
             both of shape (batch_size, pred_len, channels)
@@ -533,11 +570,13 @@ class Exp_Main(Exp_Basic):
             if the dataset is large.
             Default is False.
         """
+        # flatten batches
         preds = np.concatenate(preds, axis=0)
         trues = np.concatenate(trues, axis=0)
         inputx = np.concatenate(inputx, axis=0)
 
         ### result save ###
+        # logger
         metrics = metric(preds, trues)
         metric_msg = 'mse:{}, mae:{}'.format(metrics['mse'], metrics['mae'])
         if self.logger:
@@ -545,14 +584,31 @@ class Exp_Main(Exp_Basic):
         else:
             print(metric_msg)
 
-        # write metrics into a txt file
-        f = open(output_file, 'a')
-        f.write(model_id + "  \n")
-        f.write(f'Model size {self._get_model_size()}' + "  \n")
-        f.write('mse:{}, mae:{}, rse:{}, mape:{}'.format(
-            metrics['mse'], metrics['mae'], metrics['rse'], metrics['mape']))
-        f.write('\n')
-        f.write('\n')
+        # write metrics into a csv file
+        with open(output_file, mode='a', newline='') as f:
+            writer = csv.writer(f)
+            
+            # If the file is empty, write the header first
+            if f.tell() == 0:
+                writer.writerow([
+                    'Experiment', 'Model', 'Seed', 'Model Size',
+                    'MSE', 'MAE', 'RSE', 'MSPE', 'MAPE'])
+            
+            # Write the experiment data
+            model_size = self._get_model_size()
+            row = [
+                exp_id,
+                model_id,
+                exp_seed,
+                model_size,
+                metrics['mse'],
+                metrics['mae'],
+                metrics['rse'],
+                metrics['mspe'],
+                metrics['mape']
+            ]
+            writer.writerow(row)
+
         self.logger.log('metrics saved to output_file', level='debug')
 
         if save_all:

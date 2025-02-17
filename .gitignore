@@ -2,6 +2,7 @@
 *.pth
 dataset/
 result*.txt
+result*.csv
 test_results/
 results/
 logs/

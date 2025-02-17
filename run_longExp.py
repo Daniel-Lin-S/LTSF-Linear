@@ -3,6 +3,7 @@ import torch
 from exp.exp_main import Exp_Main
 import random
 import numpy as np
+import pandas as pd
 import os
 import sys
 from utils.logger import DualLogger
@@ -38,8 +39,8 @@ parser.add_argument('--des', type=str, default='',
                     help='experiment description added at the end of folder name')
 parser.add_argument('--log_file', type=str, default='logs/test.log',
                     help='file path of log file for the training process')
-parser.add_argument('--result_file', type=str, default='result.txt',
-                    help='file path of the txt file to store the evaluation results')
+parser.add_argument('--result_file', type=str, default='result.csv',
+                    help='file path of the csv file to store the evaluation results')
 parser.add_argument('--do_predict', action='store_true',
                     help='whether to predict unseen future data')
 parser.add_argument('--rerun', action='store_true', default=False,
@@ -167,12 +168,18 @@ if args.is_training:
         setting = f'{base_setting}_{model_setting}_{args.des}_{ii}'
 
         # skip if already tested
-        result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
-        if os.path.exists(result_path) and not args.rerun:
-            logger.log(
-                "Experiment result found in test_results, skipping...",
-                console_only=True)
-            continue
+        if os.path.exists(args.result_file):
+            df = pd.read_csv(args.result_file)
+            result_exists = (
+                (df['Model'] == model_id) & (df['Seed'] == seed) &
+                (df['Experiment'] == args.exp_id)
+                ).any()
+            
+            if result_exists and not args.rerun:
+                logger.log(
+                    "Experiment result found in test_results, skipping...",
+                    console_only=True)
+                continue
 
         # Training Stage
         stage_name = f'{args.exp_id} Experiment Initialisation'
@@ -198,7 +205,10 @@ if args.is_training:
             stage_name = f'{args.exp_id} Testing_{ii}'
             logger.stage_start(stage_name, setting)
             try:
-                exp.test(setting)
+                exp.test(
+                    setting, model_id, args.exp_id,
+                    exp_seed=seed
+                )
                 logger.stage_end(stage_name)
             except Exception as e:
                 logger.stage_failed(e, stage_name)
@@ -216,7 +226,7 @@ if args.is_training:
                 logger.stage_failed(e, stage_name)
 
         torch.cuda.empty_cache()
-else:
+else:  # test or predict already trained models
     setting = f'{base_setting}_{model_setting}_{args.des}_{args.test_idx}'
 
     # skip if already tested
@@ -239,7 +249,7 @@ else:
         stage_name = f'{args.exp_id} Prediction'
         logger.stage_start(stage_name, setting)
         try:
-            exp.predict(setting)
+            exp.predict(setting, load=True)
             logger.stage_end(stage_name)
         except Exception as e:
             logger.stage_failed(e, stage_name)
@@ -247,7 +257,10 @@ else:
         stage_name = f'{args.exp_id} Testing'
         logger.stage_start(stage_name, setting)
         try:
-            exp.test(setting)
+            exp.test(
+                setting, model_id, args.exp_id,
+                exp_seed=iteration_seeds[args.test_idx],
+                load=True)
             logger.stage_end(stage_name)
         except Exception as e:
             logger.stage_failed(e, stage_name)
