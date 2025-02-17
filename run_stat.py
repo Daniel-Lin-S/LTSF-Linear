@@ -18,7 +18,7 @@ parser.add_argument('--is_training', type=int, required=True, default=1, help='s
 parser.add_argument('--train_only', type=bool, required=False, default=False, help='Not implemented')
 parser.add_argument('--embed', type=str, default='timeF',
                     help='Not implemented')
-parser.add_argument('--model_id', type=str, required=True, default='test', help='model id')
+parser.add_argument('--exp_id', type=str, required=True, default='test', help='model id')
 parser.add_argument('--model', type=str, required=True, default='Autoformer',
                     help='model name, options: [Autoformer, Informer, Transformer]')
 
@@ -52,7 +52,7 @@ print(args)
 Exp = Exp_Main
 
 setting = '{}_{}_{}_ft{}_sl{}_pl{}_{}'.format(
-    args.model_id,
+    args.exp_id,
     args.model,
     args.data,
     args.features,

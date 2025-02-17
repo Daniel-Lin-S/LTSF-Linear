@@ -50,7 +50,7 @@ def get_base_settings(args: argparse.Namespace) -> str:
     Extract basic training settings into a string.
     """
     base_setting = '{}_{}_{}_ft{}_eb{}_sl{}_ll{}_pl{}'.format(
-        args.model_id,
+        args.exp_id,
         args.model,
         args.data,
         args.features,

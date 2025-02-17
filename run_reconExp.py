@@ -29,7 +29,7 @@ parser = argparse.ArgumentParser(description='Two-stage Prediction')
 parser.add_argument('--is_training', type=int, required=True, help='0 : no training,'
                     '1 - train prediction model only; 2 - train both reconstruction '
                     'and prediction model; 3 - train reconstruction only')
-parser.add_argument('--model_id', type=str, required=True, help='model id')
+parser.add_argument('--exp_id', type=str, required=True, help='model id')
 parser.add_argument('--model_recon', type=str, required=True,
                     help='name of reconstruction model, options: [VAE, AE]')
 parser.add_argument('--model_pred', type=str, required=True,
@@ -148,7 +148,7 @@ args = parser.parse_args()
 ### Prepare Logger ###
 logger = DualLogger(args.log_file)
 
-logger.start_experiment(args.model_id, args.is_training)
+logger.start_experiment(args.exp_id, args.is_training)
 logger.log(f'Experiment settings: \n {args}', level='debug')
 
 iteration_seeds = [random.randint(0, 2**32 - 1) for _ in range(args.itr)]
@@ -203,14 +203,14 @@ if args.is_training > 0:
         logger.log(f'Random seed: {seed}', level='debug')
 
         if args.is_training > 1:
-            stage_name = f'{args.model_id} Reconstruction Experiment Initialisation'
+            stage_name = f'{args.exp_id} Reconstruction Experiment Initialisation'
             try:
                 exp_recon = Exp_Recon(args_recon, config, logger)
             except Exception as e:
                 logger.stage_failed(e, stage_name)
                 torch.cuda.empty_cache()
                 continue
-            stage_name = f'{args.model_id} Reconstructor Training_{ii}'
+            stage_name = f'{args.exp_id} Reconstructor Training_{ii}'
             logger.stage_start(stage_name, setting)
             try:
                 exp_recon.train(setting)
@@ -227,7 +227,7 @@ if args.is_training > 0:
             # TODO - design VQVAE predictor or remove this
             if args.model_recon == 'VQVAE':
                 raise NotImplementedError
-            stage_name = f'{args.model_id} Prediction Experiment Initialisation'
+            stage_name = f'{args.exp_id} Prediction Experiment Initialisation'
             try:
                 exp_pred = Exp_pred(args_pred, model_path, config, logger)
             except Exception as e:
@@ -235,7 +235,7 @@ if args.is_training > 0:
                 torch.cuda.empty_cache()
                 continue
 
-            stage_name = f'{args.model_id} Latent Predictor Training_{ii}'
+            stage_name = f'{args.exp_id} Latent Predictor Training_{ii}'
             logger.stage_start(stage_name, setting)
             try:
                 exp_pred.train(setting)
@@ -246,7 +246,7 @@ if args.is_training > 0:
                 continue
 
             if not args.train_only:
-                stage_name = f'{args.model_id} Latent Predictor Testing_{ii}'
+                stage_name = f'{args.exp_id} Latent Predictor Testing_{ii}'
                 logger.stage_start(stage_name, setting)
                 try:
                     exp_pred.test(setting)
@@ -270,7 +270,7 @@ else:
     model_path = os.path.join(
         args.checkpoints, setting, 'reconstructor.pth')
 
-    stage_name = f'{args.model_id} Prediction Experiment Initialisation'
+    stage_name = f'{args.exp_id} Prediction Experiment Initialisation'
     try:
         exp_pred = Exp_pred(args_pred, model_path, config, logger)
     except Exception as e:
@@ -278,7 +278,7 @@ else:
         torch.cuda.empty_cache()
         sys.exit()
 
-    stage_name = f'{args.model_id} Latent Predictor Testing'
+    stage_name = f'{args.exp_id} Latent Predictor Testing'
     logger.stage_start(stage_name, setting)
     try:
         exp_pred.test(setting)

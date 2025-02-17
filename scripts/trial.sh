@@ -7,7 +7,7 @@ python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/exchange_rate \
   --data_path exchange_rate.csv \
-  --model_id Exchange_336_96 \
+  --exp_id Exchange_336_96 \
   --model STFTLinear \
   --des 'Trial' \
   --data custom \

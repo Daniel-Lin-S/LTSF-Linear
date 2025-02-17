@@ -16,7 +16,7 @@ python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path ETTh2.csv \
-  --model_id ETTh2_336_24 \
+  --exp_id ETTh2_336_24 \
   --model $model_name \
   --data ETTh2 \
   --seq_len 336 \
@@ -29,7 +29,7 @@ python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path ETTh2.csv \
-  --model_id ETTh2_336_48 \
+  --exp_id ETTh2_336_48 \
   --model $model_name \
   --data ETTh2 \
   --seq_len 336 \
@@ -42,7 +42,7 @@ python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path ETTh2.csv \
-  --model_id ETTh2_336_96 \
+  --exp_id ETTh2_336_96 \
   --model $model_name \
   --data ETTh2 \
   --seq_len 336 \
@@ -56,7 +56,7 @@ python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path ETTh2.csv \
-  --model_id ETTh2_336_192 \
+  --exp_id ETTh2_336_192 \
   --model $model_name \
   --data ETTh2 \
   --seq_len 336 \
@@ -70,7 +70,7 @@ python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path ETTh2.csv \
-  --model_id ETTh2_336_336 \
+  --exp_id ETTh2_336_336 \
   --model $model_name \
   --data ETTh2 \
   --seq_len 336 \
@@ -84,7 +84,7 @@ python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path ETTh2.csv \
-  --model_id ETTh2_336_720 \
+  --exp_id ETTh2_336_720 \
   --model $model_name \
   --data ETTh2 \
   --seq_len 336 \

@@ -21,7 +21,7 @@ python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/exchange_rate/ \
   --data_path exchange_rate.csv \
-  --model_id Exchange_$seq_len'_'$pred_len'_nfft'$nfft \
+  --exp_id Exchange_$seq_len'_'$pred_len'_nfft'$nfft \
   --model $model_name \
   --nfft $nfft \
   --data custom \

@@ -11,7 +11,7 @@ repeat=3
 gpu_id=0
 for pred_len in 96 192 336 720; do
   for individual in True False; do
-    model_id="ETTh1_${seq_len}_${pred_len}_ind${individual}"
+    exp_id="ETTh1_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_etth1_${seq_len}_${pred_len}.log"
     command="python -u run_longExp.py \
     --root_path ./dataset/ETT-small/ \
@@ -20,7 +20,7 @@ for pred_len in 96 192 336 720; do
     --enc_in 7 \
     --batch_size 32 \
     --learning_rate 0.005 \
-    --model_id $model_id \
+    --exp_id $exp_id \
     --model $model_name \
     --features M \
     --seq_len $seq_len \
@@ -38,7 +38,7 @@ for pred_len in 96 192 336 720; do
 
     eval $COMMAND
 
-    model_id="ETTh2_${seq_len}_${pred_len}_ind${individual}"
+    exp_id="ETTh2_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_etth2_${seq_len}_${pred_len}.log"
     command="python -u run_longExp.py \
     --root_path ./dataset/ETT-small/ \
@@ -47,7 +47,7 @@ for pred_len in 96 192 336 720; do
     --enc_in 7 \
     --batch_size 32 \
     --learning_rate 0.005 \
-    --model_id $model_id \
+    --exp_id $exp_id \
     --model $model_name \
     --features M \
     --seq_len $seq_len \
@@ -65,7 +65,7 @@ for pred_len in 96 192 336 720; do
 
     eval $COMMAND
 
-    model_id="ETTm1_${seq_len}_${pred_len}_ind${individual}"
+    exp_id="ETTm1_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_ettm1_${seq_len}_${pred_len}.log"
     command="python -u run_longExp.py \
     --root_path ./dataset/ETT-small/ \
@@ -74,7 +74,7 @@ for pred_len in 96 192 336 720; do
     --enc_in 7 \
     --batch_size 8 \
     --learning_rate 0.005 \
-    --model_id $model_id \
+    --exp_id $exp_id \
     --model $model_name \
     --features M \
     --seq_len $seq_len \
@@ -92,7 +92,7 @@ for pred_len in 96 192 336 720; do
 
     eval $COMMAND
 
-    model_id="ETTm2_${seq_len}_${pred_len}_ind${individual}"
+    exp_id="ETTm2_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_ettm2_${seq_len}_${pred_len}.log"
     command="python -u run_longExp.py \
     --root_path ./dataset/ETT-small/ \
@@ -101,7 +101,7 @@ for pred_len in 96 192 336 720; do
     --enc_in 7 \
     --batch_size 32 \
     --learning_rate 0.01 \
-    --model_id $model_id \
+    --exp_id $exp_id \
     --model $model_name \
     --features M \
     --seq_len $seq_len \

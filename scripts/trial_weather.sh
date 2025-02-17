@@ -2,7 +2,7 @@ python -u run_longExp.py \
   --is_training 1 \
   --root_path ./dataset/weather \
   --data_path weather.csv \
-  --model_id Weather_336_336 \
+  --exp_id Weather_336_336 \
   --model DLinear \
   --data custom \
   --features M \

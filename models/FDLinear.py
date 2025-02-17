@@ -6,12 +6,13 @@ from einops import rearrange
 
 class Model(nn.Module):
     """
-    Time Series Forecasting using STFT decomposition. \n
-    This model decomposes the input time series into
-    high and low-frequency components using STFT,
-    then applies a linear model for each frequency component to predict 
-    the future, and finally restores the prediction
-    to the time domain using inverse STFT.
+    Replace the season-trend decomposition in DLinear
+    with a similar decomposition using STFT. \n
+    Trend component: frequency component 0 is treated as trend,
+    and the other components are replaced with zeroes,
+    then iSTFT is applied to obtain the trend component. \n
+    Season component: The remaining components are treated as seasonality,
+    and similar operations are applied to obtain the seasonality component. \n
     """
 
     def __init__(self, configs):

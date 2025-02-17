@@ -27,10 +27,12 @@ parser.add_argument('--train_only', type=bool, required=False, default=False,
 parser.add_argument('--test_idx', type=int, default=0,
                     help='index of the experiment repetition used for testing'
                     ' if is_training = 0')
-parser.add_argument('--model_id', type=str, required=True, help='model id')
+parser.add_argument('--exp_id', type=str, required=True,
+                    help='Identifier of the experiment. '
+                    'Names of all folders and files will have this as a prefix')
 parser.add_argument('--model', type=str, required=True,
                     help='model name, options: [Autoformer, Informer, Transformer, '
-                    'DLinear, Linear, NLinear, FDLinear]')
+                    'DLinear, Linear, NLinear, STFTLinear, FDLinear]')
 parser.add_argument('--itr', type=int, default=2, help='number of experiment repetitions')
 parser.add_argument('--des', type=str, default='',
                     help='experiment description added at the end of folder name')
@@ -130,7 +132,7 @@ args = parser.parse_args()
 ### Prepare Logger ###
 logger = DualLogger(args.log_file)
 
-logger.start_experiment(args.model_id, args.is_training)
+logger.start_experiment(args.exp_id, args.is_training)
 logger.log(f'Experiment settings: \n {args}', level='debug')
 
 ### Set up GPU devices ###
@@ -153,6 +155,7 @@ logger.log(f'Random seeds for experiments: {iteration_seeds}', level='debug')
 ### Record basic and model settings ###
 base_setting = get_base_settings(args)
 model_setting = get_pred_model_settings(args)
+model_id = f'{args.model}_{model_setting}'
 
 ### store model hyperparameters ###
 if args.is_training:
@@ -172,7 +175,7 @@ if args.is_training:
             continue
 
         # Training Stage
-        stage_name = f'{args.model_id} Experiment Initialisation'
+        stage_name = f'{args.exp_id} Experiment Initialisation'
         try:
             exp = Exp_Main(args, logger)
         except Exception as e:
@@ -180,7 +183,7 @@ if args.is_training:
             torch.cuda.empty_cache()
             continue
 
-        stage_name = f'{args.model_id} Predictor Training_{ii}'
+        stage_name = f'{args.exp_id} Predictor Training_{ii}'
         logger.stage_start(stage_name, setting)
         try:
             exp.train(setting)
@@ -192,7 +195,7 @@ if args.is_training:
 
         # Testing Stage
         if not args.train_only:
-            stage_name = f'{args.model_id} Testing_{ii}'
+            stage_name = f'{args.exp_id} Testing_{ii}'
             logger.stage_start(stage_name, setting)
             try:
                 exp.test(setting)
@@ -204,7 +207,7 @@ if args.is_training:
 
         # Prediction Stage
         if args.do_predict:
-            stage_name = f'{args.model_id} Prediction_{ii}'
+            stage_name = f'{args.exp_id} Prediction_{ii}'
             logger.stage_start(stage_name, setting)
             try:
                 exp.predict(setting)
@@ -224,7 +227,7 @@ else:
             console_only=True)
         sys.exit()
 
-    stage_name = f'{args.model_id} Experiment Initialisation'
+    stage_name = f'{args.exp_id} Experiment Initialisation'
     try:
         exp = Exp_Main(args, logger)
     except Exception as e:
@@ -233,7 +236,7 @@ else:
         sys.exit()
 
     if args.do_predict:  # Prediction Stage
-        stage_name = f'{args.model_id} Prediction'
+        stage_name = f'{args.exp_id} Prediction'
         logger.stage_start(stage_name, setting)
         try:
             exp.predict(setting)
@@ -241,7 +244,7 @@ else:
         except Exception as e:
             logger.stage_failed(e, stage_name)
     else:  # Test Stage
-        stage_name = f'{args.model_id} Testing'
+        stage_name = f'{args.exp_id} Testing'
         logger.stage_start(stage_name, setting)
         try:
             exp.test(setting)

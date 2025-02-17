@@ -11,7 +11,7 @@ python -u run_reconExp.py \
   --is_training $is_training_value  \
   --root_path ./dataset/exchange_rate \
   --data_path exchange_rate.csv \
-  --model_id Exchange_336_96 \
+  --exp_id Exchange_336_96 \
   --model_recon VAE \
   --model_pred $model \
   --des 'Trial' \

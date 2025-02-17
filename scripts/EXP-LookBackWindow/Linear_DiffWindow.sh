@@ -8,7 +8,7 @@ do
     --is_training 1 \
     --root_path ./dataset/ \
     --data_path electricity.csv \
-    --model_id Electricity_$seq_len'_'$pred_len \
+    --exp_id Electricity_$seq_len'_'$pred_len \
     --model $model_name \
     --data custom \
     --features M \
@@ -24,7 +24,7 @@ do
     --is_training 1 \
     --root_path ./dataset/ \
     --data_path ETTh1.csv \
-    --model_id ETTh1_$seq_len'_'$pred_len \
+    --exp_id ETTh1_$seq_len'_'$pred_len \
     --model $model_name \
     --data ETTh1 \
     --features M \
@@ -40,7 +40,7 @@ do
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path Etth2.csv \
-  --model_id Etth2_$seq_len'_'$pred_len \
+  --exp_id Etth2_$seq_len'_'$pred_len \
   --model $model_name \
   --data Etth2 \
   --features M \
@@ -58,7 +58,7 @@ do
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path exchange_rate.csv \
-  --model_id Exchange_$seq_len'_'$pred_len \
+  --exp_id Exchange_$seq_len'_'$pred_len \
   --model $model_name \
   --data custom \
   --features M \
@@ -74,7 +74,7 @@ do
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path traffic.csv \
-  --model_id traffic_$seq_len'_'$pred_len \
+  --exp_id traffic_$seq_len'_'$pred_len \
   --model $model_name \
   --data custom \
   --features M \
@@ -90,7 +90,7 @@ do
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path weather.csv \
-  --model_id weather_$seq_len'_'$pred_len \
+  --exp_id weather_$seq_len'_'$pred_len \
   --model $model_name \
   --data custom \
   --features M \
@@ -112,7 +112,7 @@ do
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path Ettm1.csv \
-  --model_id Ettm1_$seq_len'_'$pred_len \
+  --exp_id Ettm1_$seq_len'_'$pred_len \
   --model $model_name \
   --data Ettm1 \
   --features M \
@@ -128,7 +128,7 @@ do
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path Ettm2.csv \
-  --model_id Ettm2_$seq_len'_'$pred_len \
+  --exp_id Ettm2_$seq_len'_'$pred_len \
   --model $model_name \
   --data Ettm2 \
   --features M \
@@ -150,7 +150,7 @@ do
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path national_illness.csv \
-  --model_id national_illness_$seq_len'_'$pred_len \
+  --exp_id national_illness_$seq_len'_'$pred_len \
   --model $model_name \
   --data custom \
   --features M \

@@ -116,11 +116,13 @@ class Exp_Main(Exp_Basic):
         return model
 
     def _get_data(self, flag) -> Tuple[Dataset, DataLoader]:
-        data_set, data_loader = data_provider(self.args, flag, 'pred', self.logger)
+        data_set, data_loader = data_provider(
+            self.args, flag, mode='pred', logger=self.logger)
         return data_set, data_loader
 
     def _select_optimizer(self):
-        model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
+        model_optim = optim.Adam(
+            self.model.parameters(), lr=self.args.learning_rate)
         return model_optim
     
     def _get_model_size(self) -> str:
@@ -200,7 +202,8 @@ class Exp_Main(Exp_Basic):
                 outputs = self.model(
                     batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
             else:
-                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                outputs = self.model(
+                    batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
         if outputs.shape[1] != self.args.pred_len:
             error_msg = (
@@ -228,7 +231,8 @@ class Exp_Main(Exp_Basic):
         """
         dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
         dec_inp = torch.cat(
-            [batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+            [batch_y[:, :self.args.label_len, :], dec_inp],
+            dim=1).float().to(self.device)
         return dec_inp
 
 
@@ -344,7 +348,8 @@ class Exp_Main(Exp_Basic):
                     loss.backward()
                     model_optim.step()
 
-            epoch_msg = "Epoch: {0} cost time: {1:.4f}s".format(epoch + 1, time.time() - epoch_time)
+            epoch_msg = "Epoch: {0} cost time: {1:.4f}s".format(
+                epoch + 1, time.time() - epoch_time)
             if self.logger:
                 self.logger.log(epoch_msg)
             else:
@@ -355,7 +360,8 @@ class Exp_Main(Exp_Basic):
                 vali_loss = self.vali(vali_data, vali_loader, criterion)
                 test_loss = self.vali(test_data, test_loader, criterion)
 
-                msg = "Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
+                msg = ("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} "
+                       "Vali Loss: {3:.7f} Test Loss: {4:.7f}").format(
                     epoch + 1, train_steps, train_loss, vali_loss, test_loss)
 
                 early_stopping(vali_loss, self.model, path)
@@ -425,7 +431,7 @@ class Exp_Main(Exp_Basic):
             print(msg)
 
     def test(self, setting: str, test: int=0):
-        test_data, test_loader = self._get_data(flag='test')
+        _, test_loader = self._get_data(flag='test')
         
         if test:
             file_path = os.path.join('./checkpoints/' + setting, 'checkpoint.pth')
@@ -451,7 +457,8 @@ class Exp_Main(Exp_Basic):
             test_bar = tqdm(test_loader,
                             desc=f"[Testing]",
                             leave=False)
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_bar):
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark
+                    ) in enumerate(test_bar):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
 
@@ -463,9 +470,11 @@ class Exp_Main(Exp_Basic):
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
-                        outputs = self._get_output(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                        outputs = self._get_output(
+                            batch_x, batch_x_mark, dec_inp, batch_y_mark)
                 else:
-                    outputs = self._get_output(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                    outputs = self._get_output(
+                        batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
                 batch_y, outputs = self._extract_prediction(batch_y, outputs)
                 # print(outputs.shape,batch_y.shape)
@@ -490,7 +499,7 @@ class Exp_Main(Exp_Basic):
 
         return
 
-    def _save_results(self, setting: str,
+    def _save_results(self, setting: str, model_id: str,
                       preds: torch.Tensor, trues: torch.Tensor,
                       inputx: torch.Tensor,
                       output_file: str='result.txt',
@@ -502,12 +511,17 @@ class Exp_Main(Exp_Basic):
         Parameters
         ----------
         setting : str
-            the identifier of this experiment
+            The identifier of this experiment.
+        model_id : str
+            The identifier of this model,
+            composing of model name and relevant hyperparameters.
         preds, trues : torch.Tensor
-            the predicted values and ground truth
+            the predicted values and ground truth,
+            both of shape (batch_size, pred_len, channels)
         inputx : torch.Tensor
             the input series used to produce the
-            predicted values
+            predicted values.
+            Shape: (batch_size, seq_len, channels)
         output_file : str
             Path to the txt file in which
             the metrics will be stored.
@@ -533,7 +547,7 @@ class Exp_Main(Exp_Basic):
 
         # write metrics into a txt file
         f = open(output_file, 'a')
-        f.write(setting + "  \n")
+        f.write(model_id + "  \n")
         f.write(f'Model size {self._get_model_size()}' + "  \n")
         f.write('mse:{}, mae:{}, rse:{}, mape:{}'.format(
             metrics['mse'], metrics['mae'], metrics['rse'], metrics['mape']))
@@ -569,7 +583,8 @@ class Exp_Main(Exp_Basic):
 
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(pred_loader):
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark
+                    ) in enumerate(pred_loader):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float()
                 batch_x_mark = batch_x_mark.float().to(self.device)
@@ -579,9 +594,11 @@ class Exp_Main(Exp_Basic):
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
-                        outputs = self._get_output(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                        outputs = self._get_output(
+                            batch_x, batch_x_mark, dec_inp, batch_y_mark)
                 else:
-                    outputs = self._get_output(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                    outputs = self._get_output(
+                        batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
                 pred = outputs.detach().cpu().numpy()  # .squeeze()
                 preds.append(pred)

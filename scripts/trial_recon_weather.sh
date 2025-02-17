@@ -2,7 +2,7 @@ python -u run_reconExp.py \
   --is_training 1 \
   --root_path ./dataset/weather \
   --data_path weather.csv \
-  --model_id Weather_336_336 \
+  --exp_id Weather_336_336 \
   --model VAE \
   --pred_model DLinear \
   --data recon \
