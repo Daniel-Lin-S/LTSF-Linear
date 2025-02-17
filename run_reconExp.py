@@ -146,159 +146,161 @@ parser.add_argument('--use_multi_gpu', action='store_true',
 parser.add_argument('--devices', type=str, default='0,1,2,3',
                     help='device ids of multile gpus')
 
-args = parser.parse_args()
 
-### Prepare Logger ###
-logger = DualLogger(args.log_file)
+if __name__ == '__main__':
+    args = parser.parse_args()
 
-logger.start_experiment(args.exp_id, args.is_training)
-logger.log(f'Experiment settings: \n {args}', level='debug')
+    ### Prepare Logger ###
+    logger = DualLogger(args.log_file)
 
-iteration_seeds = [random.randint(0, 2**32 - 1) for _ in range(args.itr)]
+    logger.start_experiment(args.exp_id, args.is_training)
+    logger.log(f'Experiment settings: \n {args}', level='debug')
 
-### Set up GPU devices ###
-if not torch.cuda.is_available() and args.use_gpu:
-    logger.log('use_gpu = True but GPU not available, '
-               'deviced changed to cpu',
-               level='warning')
-    args.use_gpu = False
+    iteration_seeds = [random.randint(0, 2**32 - 1) for _ in range(args.itr)]
 
-if args.use_gpu and args.use_multi_gpu:
-    args.dvices = args.devices.replace(' ', '')
-    device_ids = args.devices.split(',')
-    args.device_ids = [int(id_) for id_ in device_ids]
-    args.gpu = args.device_ids[0]
+    ### Set up GPU devices ###
+    if not torch.cuda.is_available() and args.use_gpu:
+        logger.log('use_gpu = True but GPU not available, '
+                'deviced changed to cpu',
+                level='warning')
+        args.use_gpu = False
 
-### Record basic and model settings ###
-config = load_yaml_param_settings(args.config)
+    if args.use_gpu and args.use_multi_gpu:
+        args.dvices = args.devices.replace(' ', '')
+        device_ids = args.devices.split(',')
+        args.device_ids = [int(id_) for id_ in device_ids]
+        args.gpu = args.device_ids[0]
 
-base_setting = get_base_settings(args)
-recon_model_setting = get_recon_model_settings(args, config)
-pred_model_setting = get_pred_model_settings(args)
-model_setting = f'{pred_model_setting}_{recon_model_setting}'
-model_id = (f'{args.model_recon}_{recon_model_setting}_'
-                 f'{args.model_pred}_{pred_model_setting}')
+    ### Record basic and model settings ###
+    config = load_yaml_param_settings(args.config)
 
-### Set specific latent prediction experiment ###
-if args.model_recon == 'AE':
-    Exp_pred = Exp_AE2D_Pred
-elif args.model_recon == 'VAE':
-    Exp_pred = Exp_VAE2D_Pred
+    base_setting = get_base_settings(args)
+    recon_model_setting = get_recon_model_settings(args, config)
+    pred_model_setting = get_pred_model_settings(args)
+    model_setting = f'{pred_model_setting}_{recon_model_setting}'
+    model_id = (f'{args.model_recon}_{recon_model_setting}_'
+                    f'{args.model_pred}_{pred_model_setting}')
 
-### Two-stage Training and Testing ###
-args_recon, args_pred = split_args_two_stages(args)
+    ### Set specific latent prediction experiment ###
+    if args.model_recon == 'AE':
+        Exp_pred = Exp_AE2D_Pred
+    elif args.model_recon == 'VAE':
+        Exp_pred = Exp_VAE2D_Pred
 
-if args.is_training > 0:
-    for ii, seed in enumerate(iteration_seeds):
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
+    ### Two-stage Training and Testing ###
+    args_recon, args_pred = split_args_two_stages(args)
 
-        # add experiment id
-        setting = f'{base_setting}_{model_setting}_{args.des}_{ii}'
+    if args.is_training > 0:
+        for ii, seed in enumerate(iteration_seeds):
+            random.seed(seed)
+            np.random.seed(seed)
+            torch.manual_seed(seed)
 
-        # skip if already tested
-        if os.path.exists(args.result_file):
-            df = pd.read_csv(args.result_file)
-            result_exists = (
-                (df['Model ID'] == model_id) & (df['Seed'] == seed)
-                ).any()
-            
-            if result_exists and not args.rerun:
-                logger.log(
-                    "Experiment result found in test_results, skipping...",
-                    console_only=True)
-                continue
+            # add experiment id
+            setting = f'{base_setting}_{model_setting}_{args.des}_{ii}'
 
-        logger.log(f'Random seed: {seed}', level='debug')
+            # skip if already tested
+            if os.path.exists(args.result_file):
+                df = pd.read_csv(args.result_file)
+                result_exists = (
+                    (df['Model ID'] == model_id) & (df['Seed'] == seed)
+                    ).any()
+                
+                if result_exists and not args.rerun:
+                    logger.log(
+                        "Experiment result found in test_results, skipping...",
+                        console_only=True)
+                    continue
 
-        if args.is_training > 1:
-            stage_name = f'{args.exp_id} Reconstruction Experiment Initialisation'
-            try:
-                exp_recon = Exp_Recon(args_recon, config, logger)
-            except Exception as e:
-                logger.stage_failed(e, stage_name)
-                torch.cuda.empty_cache()
-                continue
-            stage_name = f'{args.exp_id} Reconstructor Training_{ii}'
-            logger.stage_start(stage_name, setting)
-            try:
-                exp_recon.train(setting)
-                logger.stage_end(stage_name)
-            except Exception as e:
-                logger.stage_failed(e, stage_name)
-                torch.cuda.empty_cache()
-                continue
+            logger.log(f'Random seed: {seed}', level='debug')
 
-        model_path = os.path.join(
-            args.checkpoints, setting, 'reconstructor.pth')
-        
-        if args.is_training < 3:
-            # TODO - design VQVAE predictor or remove this
-            if args.model_recon == 'VQVAE':
-                raise NotImplementedError
-            stage_name = f'{args.exp_id} Prediction Experiment Initialisation'
-            try:
-                exp_pred = Exp_pred(args_pred, model_path, config, logger)
-            except Exception as e:
-                logger.stage_failed(e, stage_name)
-                torch.cuda.empty_cache()
-                continue
-
-            stage_name = f'{args.exp_id} Latent Predictor Training_{ii}'
-            logger.stage_start(stage_name, setting)
-            try:
-                exp_pred.train(setting)
-                logger.stage_end(stage_name)
-            except Exception as e:
-                logger.stage_failed(e, stage_name)
-                torch.cuda.empty_cache()
-                continue
-
-            if not args.train_only:
-                stage_name = f'{args.exp_id} Latent Predictor Testing_{ii}'
+            if args.is_training > 1:
+                stage_name = f'{args.exp_id} Reconstruction Experiment Initialisation'
+                try:
+                    exp_recon = Exp_Recon(args_recon, config, logger)
+                except Exception as e:
+                    logger.stage_failed(e, stage_name)
+                    torch.cuda.empty_cache()
+                    continue
+                stage_name = f'{args.exp_id} Reconstructor Training_{ii}'
                 logger.stage_start(stage_name, setting)
                 try:
-                    exp_pred.test(
-                        setting, model_id, args.exp_id,
-                        exp_seed=seed)
+                    exp_recon.train(setting)
                     logger.stage_end(stage_name)
                 except Exception as e:
                     logger.stage_failed(e, stage_name)
+                    torch.cuda.empty_cache()
+                    continue
+
+            model_path = os.path.join(
+                args.checkpoints, setting, 'reconstructor.pth')
+            
+            if args.is_training < 3:
+                # TODO - design VQVAE predictor or remove this
+                if args.model_recon == 'VQVAE':
+                    raise NotImplementedError
+                stage_name = f'{args.exp_id} Prediction Experiment Initialisation'
+                try:
+                    exp_pred = Exp_pred(args_pred, model_path, config, logger)
+                except Exception as e:
+                    logger.stage_failed(e, stage_name)
+                    torch.cuda.empty_cache()
+                    continue
+
+                stage_name = f'{args.exp_id} Latent Predictor Training_{ii}'
+                logger.stage_start(stage_name, setting)
+                try:
+                    exp_pred.train(setting)
+                    logger.stage_end(stage_name)
+                except Exception as e:
+                    logger.stage_failed(e, stage_name)
+                    torch.cuda.empty_cache()
+                    continue
+
+                if not args.train_only:
+                    stage_name = f'{args.exp_id} Latent Predictor Testing_{ii}'
+                    logger.stage_start(stage_name, setting)
+                    try:
+                        exp_pred.test(
+                            setting, model_id, args.exp_id,
+                            exp_seed=seed)
+                        logger.stage_end(stage_name)
+                    except Exception as e:
+                        logger.stage_failed(e, stage_name)
+
+            torch.cuda.empty_cache()
+    else:
+        setting = f'{base_setting}_{model_setting}_{args.des}_{args.test_idx}'
+
+        # skip if already tested
+        result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
+        if os.path.exists(result_path) and not args.rerun:
+            logger.log(
+                "Experiment result found in test_results, skipping...",
+                console_only=True)
+            sys.exit()
+
+        # path to the reconstruction model
+        model_path = os.path.join(
+            args.checkpoints, setting, 'reconstructor.pth')
+
+        stage_name = f'{args.exp_id} Prediction Experiment Initialisation'
+        try:
+            exp_pred = Exp_pred(args_pred, model_path, config, logger)
+        except Exception as e:
+            logger.stage_failed(e, stage_name)
+            torch.cuda.empty_cache()
+            sys.exit()
+
+        stage_name = f'{args.exp_id} Latent Predictor Testing'
+        logger.stage_start(stage_name, setting)
+        try:
+            exp_pred.test(
+                setting, model_id, args.exp_id,
+                exp_seed=iteration_seeds[args.test_idx],
+                load=True)
+            logger.stage_end(stage_name)
+        except Exception as e:
+            logger.stage_failed(e, stage_name)
 
         torch.cuda.empty_cache()
-else:
-    setting = f'{base_setting}_{model_setting}_{args.des}_{args.test_idx}'
-
-    # skip if already tested
-    result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
-    if os.path.exists(result_path) and not args.rerun:
-        logger.log(
-            "Experiment result found in test_results, skipping...",
-            console_only=True)
-        sys.exit()
-
-    # path to the reconstruction model
-    model_path = os.path.join(
-        args.checkpoints, setting, 'reconstructor.pth')
-
-    stage_name = f'{args.exp_id} Prediction Experiment Initialisation'
-    try:
-        exp_pred = Exp_pred(args_pred, model_path, config, logger)
-    except Exception as e:
-        logger.stage_failed(e, stage_name)
-        torch.cuda.empty_cache()
-        sys.exit()
-
-    stage_name = f'{args.exp_id} Latent Predictor Testing'
-    logger.stage_start(stage_name, setting)
-    try:
-        exp_pred.test(
-            setting, model_id, args.exp_id,
-            exp_seed=iteration_seeds[args.test_idx],
-            load=True)
-        logger.stage_end(stage_name)
-    except Exception as e:
-        logger.stage_failed(e, stage_name)
-
-    torch.cuda.empty_cache()

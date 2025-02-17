@@ -128,140 +128,143 @@ parser.add_argument('--use_multi_gpu', action='store_true', help='use multiple g
 parser.add_argument('--devices', type=str, default='0,1,2,3', help='device ids of multile gpus')
 parser.add_argument('--test_flop', action='store_true', default=False, help='See utils/tools for usage')
 
-args = parser.parse_args()
 
-### Prepare Logger ###
-logger = DualLogger(args.log_file)
+if __name__ == '__main__':
+    args = parser.parse_args()
 
-logger.start_experiment(args.exp_id, args.is_training)
-logger.log(f'Experiment settings: \n {args}', level='debug')
+    ### Prepare Logger ###
+    logger = DualLogger(args.log_file)
 
-### Set up GPU devices ###
-if not torch.cuda.is_available() and args.use_gpu:
-    logger.log('use_gpu = True but GPU not available, '
-               'deviced changed to cpu',
-               level='warning')
-    args.use_gpu = False
+    logger.start_experiment(args.exp_id, args.is_training)
+    logger.log(f'Experiment settings: \n {args}', level='debug')
 
-if args.use_gpu and args.use_multi_gpu:
-    args.dvices = args.devices.replace(' ', '')
-    device_ids = args.devices.split(',')
-    args.device_ids = [int(id_) for id_ in device_ids]
-    args.gpu = args.device_ids[0]
+    ### Set up GPU devices ###
+    if not torch.cuda.is_available() and args.use_gpu:
+        logger.log('use_gpu = True but GPU not available, '
+                'deviced changed to cpu',
+                level='warning')
+        args.use_gpu = False
 
-### Set seeds for iterations ###
-iteration_seeds = [random.randint(0, 2**32 - 1) for _ in range(args.itr)]
-logger.log(f'Random seeds for experiments: {iteration_seeds}', level='debug')
+    if args.use_gpu and args.use_multi_gpu:
+        args.dvices = args.devices.replace(' ', '')
+        device_ids = args.devices.split(',')
+        args.device_ids = [int(id_) for id_ in device_ids]
+        args.gpu = args.device_ids[0]
 
-### Record basic and model settings ###
-base_setting = get_base_settings(args)
-model_setting = get_pred_model_settings(args)
-model_id = f'{args.model}_{model_setting}'
+    ### Set seeds for iterations ###
+    iteration_seeds = [random.randint(0, 2**32 - 1) for _ in range(args.itr)]
+    logger.log(f'Random seeds for experiments: {iteration_seeds}', level='debug')
 
-### store model hyperparameters ###
-if args.is_training:
-    for ii, seed in enumerate(iteration_seeds):
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
+    ### Record basic and model settings ###
+    base_setting = get_base_settings(args)
+    model_setting = get_pred_model_settings(args)
+    model_id = f'{args.model}_{model_setting}'
 
-        setting = f'{base_setting}_{model_setting}_{args.des}_{ii}'
+    ### store model hyperparameters ###
+    if args.is_training:
+        for ii, seed in enumerate(iteration_seeds):
+            random.seed(seed)
+            np.random.seed(seed)
+            torch.manual_seed(seed)
 
-        # skip if already tested
-        if os.path.exists(args.result_file):
-            df = pd.read_csv(args.result_file)
-            result_exists = (
-                (df['Model'] == model_id) & (df['Seed'] == seed) &
-                (df['Experiment'] == args.exp_id)
-                ).any()
-            
-            if result_exists and not args.rerun:
-                logger.log(
-                    "Experiment result found in test_results, skipping...",
-                    console_only=True)
+            setting = f'{base_setting}_{model_setting}_{args.des}_{ii}'
+
+            # skip if already tested
+            if os.path.exists(args.result_file):
+                df = pd.read_csv(args.result_file)
+                result_exists = (
+                    (df['Model'] == model_id) & (df['Seed'] == seed) &
+                    (df['Experiment'] == args.exp_id)
+                    ).any()
+                
+                if result_exists and not args.rerun:
+                    logger.log(
+                        "Experiment result found in test_results, skipping...",
+                        console_only=True)
+                    continue
+
+            # Training Stage
+            stage_name = f'{args.exp_id} Experiment Initialisation'
+            try:
+                exp = Exp_Main(args, logger)
+            except Exception as e:
+                logger.stage_failed(e, stage_name)
+                torch.cuda.empty_cache()
                 continue
 
-        # Training Stage
-        stage_name = f'{args.exp_id} Experiment Initialisation'
-        try:
-            exp = Exp_Main(args, logger)
-        except Exception as e:
-            logger.stage_failed(e, stage_name)
-            torch.cuda.empty_cache()
-            continue
-
-        stage_name = f'{args.exp_id} Predictor Training_{ii}'
-        logger.stage_start(stage_name, setting)
-        try:
-            exp.train(setting)
-            logger.stage_end(stage_name)
-        except Exception as e:
-            logger.stage_failed(e, stage_name)
-            torch.cuda.empty_cache()
-            continue
-
-        # Testing Stage
-        if not args.train_only:
-            stage_name = f'{args.exp_id} Testing_{ii}'
+            stage_name = f'{args.exp_id} Predictor Training_{ii}'
             logger.stage_start(stage_name, setting)
             try:
-                exp.test(
-                    setting, model_id, args.exp_id,
-                    exp_seed=seed
-                )
+                exp.train(setting)
                 logger.stage_end(stage_name)
             except Exception as e:
                 logger.stage_failed(e, stage_name)
                 torch.cuda.empty_cache()
                 continue
 
-        # Prediction Stage
-        if args.do_predict:
-            stage_name = f'{args.exp_id} Prediction_{ii}'
+            # Testing Stage
+            if not args.train_only:
+                stage_name = f'{args.exp_id} Testing_{ii}'
+                logger.stage_start(stage_name, setting)
+                try:
+                    exp.test(
+                        setting, model_id, args.exp_id,
+                        exp_seed=seed
+                    )
+                    logger.stage_end(stage_name)
+                except Exception as e:
+                    logger.stage_failed(e, stage_name)
+                    torch.cuda.empty_cache()
+                    continue
+
+            # Prediction Stage
+            if args.do_predict:
+                stage_name = f'{args.exp_id} Prediction_{ii}'
+                logger.stage_start(stage_name, setting)
+                try:
+                    exp.predict(setting)
+                    logger.stage_end(stage_name)
+                except Exception as e:
+                    logger.stage_failed(e, stage_name)
+
+            torch.cuda.empty_cache()
+    else:  # test or predict already trained models
+        setting = f'{base_setting}_{model_setting}_{args.des}_{args.test_idx}'
+
+        # skip if already tested
+        result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
+        if os.path.exists(result_path) and not args.rerun:
+            logger.log(
+                "Experiment result found in test_results, skipping...",
+                console_only=True)
+            sys.exit()
+
+        stage_name = f'{args.exp_id} Experiment Initialisation'
+        try:
+            exp = Exp_Main(args, logger)
+        except Exception as e:
+            logger.stage_failed(e, stage_name)
+            torch.cuda.empty_cache()
+            sys.exit()
+
+        if args.do_predict:  # Prediction Stage
+            stage_name = f'{args.exp_id} Prediction'
             logger.stage_start(stage_name, setting)
             try:
-                exp.predict(setting)
+                exp.predict(setting, load=True)
+                logger.stage_end(stage_name)
+            except Exception as e:
+                logger.stage_failed(e, stage_name)
+        else:  # Test Stage
+            stage_name = f'{args.exp_id} Testing'
+            logger.stage_start(stage_name, setting)
+            try:
+                exp.test(
+                    setting, model_id, args.exp_id,
+                    exp_seed=iteration_seeds[args.test_idx],
+                    load=True)
                 logger.stage_end(stage_name)
             except Exception as e:
                 logger.stage_failed(e, stage_name)
 
         torch.cuda.empty_cache()
-else:  # test or predict already trained models
-    setting = f'{base_setting}_{model_setting}_{args.des}_{args.test_idx}'
-
-    # skip if already tested
-    result_path = './test_results/' + setting + '/' + 'pred_0.pdf'
-    if os.path.exists(result_path) and not args.rerun:
-        logger.log(
-            "Experiment result found in test_results, skipping...",
-            console_only=True)
-        sys.exit()
-
-    stage_name = f'{args.exp_id} Experiment Initialisation'
-    try:
-        exp = Exp_Main(args, logger)
-    except Exception as e:
-        logger.stage_failed(e, stage_name)
-        torch.cuda.empty_cache()
-        sys.exit()
-
-    if args.do_predict:  # Prediction Stage
-        stage_name = f'{args.exp_id} Prediction'
-        logger.stage_start(stage_name, setting)
-        try:
-            exp.predict(setting, load=True)
-            logger.stage_end(stage_name)
-        except Exception as e:
-            logger.stage_failed(e, stage_name)
-    else:  # Test Stage
-        stage_name = f'{args.exp_id} Testing'
-        logger.stage_start(stage_name, setting)
-        try:
-            exp.test(
-                setting, model_id, args.exp_id,
-                exp_seed=iteration_seeds[args.test_idx],
-                load=True)
-            logger.stage_end(stage_name)
-        except Exception as e:
-            logger.stage_failed(e, stage_name)
-    torch.cuda.empty_cache()
