@@ -7,4 +7,4 @@ results/
 logs/
 *.log
 .DS_Store
-test_*.py
+try_*.py
