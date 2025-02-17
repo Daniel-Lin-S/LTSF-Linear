@@ -2,14 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from layers.Embed import DataEmbedding, DataEmbedding_wo_pos,DataEmbedding_wo_pos_temp,DataEmbedding_wo_temp
-from layers.AutoCorrelation import AutoCorrelation, AutoCorrelationLayer
+from layers.AutoCorrelation import AutoCorrelationLayer
 from layers.FourierCorrelation import FourierBlock, FourierCrossAttention
 from layers.MultiWaveletCorrelation import MultiWaveletCross, MultiWaveletTransform
-from layers.SelfAttention_Family import FullAttention, ProbAttention
-# from layers.FED_wo_decomp import Encoder, Decoder, EncoderLayer, DecoderLayer, my_Layernorm, series_decomp, series_decomp_multi
-from layers.Autoformer_EncDec import Encoder, Decoder, EncoderLayer, DecoderLayer, my_Layernorm, series_decomp, series_decomp_multi
-import math
-import numpy as np
+from layers.Autoformer_EncDec import Encoder, Decoder, EncoderLayer, DecoderLayer, my_Layernorm
+from layers.Decompositions import SeasonTrendDecomp, MultiSeasonTrendDecomp
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -21,20 +18,17 @@ class Model(nn.Module):
     """
     def __init__(self, configs):
         super(Model, self).__init__()
-        self.version = configs.version
-        self.mode_select = configs.mode_select
-        self.modes = configs.modes
         self.seq_len = configs.seq_len
         self.label_len = configs.label_len
         self.pred_len = configs.pred_len
         self.output_attention = configs.output_attention
 
-        # Decomp
+        # Decomposition
         kernel_size = configs.moving_avg
         if isinstance(kernel_size, list):
-            self.decomp = series_decomp_multi(kernel_size)
+            self.decomp = MultiSeasonTrendDecomp(kernel_size)
         else:
-            self.decomp = series_decomp(kernel_size)
+            self.decomp = SeasonTrendDecomp(kernel_size)
 
         # Embedding
         # The series-wise connection inherently contains the sequential information.
@@ -75,7 +69,7 @@ class Model(nn.Module):
                                                   ich=configs.d_model,
                                                   base=configs.base,
                                                   activation=configs.cross_activation)
-        else:
+        elif configs.version == 'Fourier':
             encoder_self_att = FourierBlock(in_channels=configs.d_model,
                                             out_channels=configs.d_model,
                                             seq_len=self.seq_len,
@@ -92,6 +86,11 @@ class Model(nn.Module):
                                                       seq_len_kv=self.seq_len,
                                                       modes=configs.modes,
                                                       mode_select_method=configs.mode_select)
+        else:
+            raise ValueError(
+                'Invalid version'
+                'Choose from [Wavelets, Fourier]')
+
         # Encoder
         enc_modes = int(min(configs.modes, configs.seq_len//2))
         dec_modes = int(min(configs.modes, (configs.seq_len//2+configs.pred_len)//2))
@@ -164,7 +163,6 @@ class Model(nn.Module):
             enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
         # decomp init
         mean = torch.mean(x_enc, dim=1).unsqueeze(1).repeat(1, self.pred_len, 1)
-        zeros = torch.zeros([x_dec.shape[0], self.pred_len, x_dec.shape[2]]).to(device)  # cuda()
         seasonal_init, trend_init = self.decomp(x_enc)
         # decoder input
         trend_init = torch.cat([trend_init[:, -self.label_len:, :], mean], dim=1)

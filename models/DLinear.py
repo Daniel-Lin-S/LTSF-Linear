@@ -1,69 +1,15 @@
 import torch
 import torch.nn as nn
 
-class moving_avg(nn.Module):
-    """
-    Moving average block to highlight the trend of time series
-    """
-    def __init__(self, kernel_size: int, stride: int):
-        """
-        Parameters
-        ----------
-        kernel_size: int
-            the size of the averaging window
-        stride: int
-            distance between starting point
-            of adjacent windows. 
-        """
-        super(moving_avg, self).__init__()
-        self.kernel_size = kernel_size
-        self.avg = nn.AvgPool1d(kernel_size=kernel_size, stride=stride, padding=0)
-
-    def forward(self, x):
-        """
-        Compute a smooth version of x
-
-        Parameter
-        ---------
-        x : torch.Tensor
-            of shape (batch_size, length, channels)
-
-        Return
-        ------
-        torch.Tensor
-            of the same shape as input
-        """
-        # padding on the both ends of time series to preserve length
-        front = x[:, 0:1, :].repeat(1, (self.kernel_size - 1) // 2, 1)
-        end = x[:, -1:, :].repeat(1, (self.kernel_size - 1) // 2, 1)
-        x = torch.cat([front, x, end], dim=1)
-
-        # take the average on temporal axis
-        x = self.avg(x.permute(0, 2, 1))
-        x = x.permute(0, 2, 1)
-        return x
-
-
-class series_decomp(nn.Module):
-    """
-    Series decomposition block
-    """
-    def __init__(self, kernel_size):
-        super(series_decomp, self).__init__()
-        self.moving_avg = moving_avg(kernel_size, stride=1)
-
-    def forward(self, x):
-        moving_mean = self.moving_avg(x)
-        res = x - moving_mean
-        return res, moving_mean
+from layers.Decompositions import SeasonTrendDecomp
 
 class Model(nn.Module):
     """
     Decomposition-Linear Model for Time Series Forecasting.
     
-    This model decomposes the input time series into seasonal and trend components, then 
-    applies linear regression layers to predict the seasonal and trend components separately. 
-    Finally, the predictions for both components are summed to produce the final forecast.
+    1. Decomposes the input time series into seasonal and trend components 
+    2. Applies two linear layers to predict the components separately. 
+    3. The predictions are summed.
     """
     def __init__(self, configs):
         """
@@ -84,7 +30,7 @@ class Model(nn.Module):
 
         # Decompsition Kernel Size
         kernel_size = 25
-        self.decompsition = series_decomp(kernel_size)
+        self.decompsition = SeasonTrendDecomp(kernel_size)
         self.individual = configs.individual
         self.channels = configs.enc_in
 
@@ -99,7 +45,7 @@ class Model(nn.Module):
             self.Linear_Seasonal = nn.Linear(self.seq_len,self.pred_len)
             self.Linear_Trend = nn.Linear(self.seq_len,self.pred_len)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the model.
 

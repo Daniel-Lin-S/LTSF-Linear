@@ -110,6 +110,24 @@ parser.add_argument('--activation', type=str, default='gelu', help='activation')
 parser.add_argument('--output_attention',
                     action='store_true', help='whether to output attention in ecoder')
 
+# FEDformer
+parser.add_argument('--fed_version', type=str, default='Fourier',
+                    help='the version of the FEDformer model, '
+                    'one of Wavelets, Fourier')
+parser.add_argument('--mode_select', type=str, default='random',
+                    help='method to select frequency modes, options: random, top')
+parser.add_argument('--modes', type=int, default=64,
+                    help='number of main frequencies to select')
+parser.add_argument('--wavelet_ignores', type=int, default=3,
+                    help='Number of wavelet scales to skip. Only valid when '
+                    'fed_version is Wavelets')
+parser.add_argument('--wavelet_base', type=str, default='legendre',
+                    help='base wavelet used for Multiwavelet, '
+                    'one of [legendre, chebyshev]')
+parser.add_argument('--cross_activation', type=str, default='tanh',
+                    help='Multiwavelet cross atention activation function:'
+                     'one of [tanh, softmax]')
+
 # optimization
 parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
 parser.add_argument('--train_epochs', type=int, default=10, help='train epochs')
@@ -131,6 +149,11 @@ parser.add_argument('--test_flop', action='store_true', default=False, help='See
 
 if __name__ == '__main__':
     args = parser.parse_args()
+
+    # rename for FEDformer
+    args.version = args.fed_version
+    args.L = args.wavelet_ignores
+    args.base = args.wavelet_base
 
     ### Prepare Logger ###
     logger = DualLogger(args.log_file)

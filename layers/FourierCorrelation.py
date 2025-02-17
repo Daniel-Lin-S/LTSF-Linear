@@ -6,21 +6,45 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from typing import List
 
-def get_frequency_modes(seq_len, modes=64, mode_select_method='random'):
+
+def get_frequency_modes(
+        seq_len: int, modes: int=64,
+        mode_select_method='random'
+    ) -> List[int]:
     """
-    get modes on frequency domain:
-    'random' means sampling randomly;
-    'else' means sampling the lowest modes;
+    Indices of main frequencies for Fourier transformation.
+
+    Parameters
+    ----------
+    seq_len : int
+        The length of sequence.
+    modes : int
+        The number of main frequencies to select.
+    mode_select_method : str
+        The method to select frequency modes.
+        Options are 'random' and 'top'.
+        - 'random' : Randomly select frequency modes.
+        - 'top' : Select top frequency modes.
+    
+    Returns
+    -------
+    index : list
+        The indices of selected frequency modes.
     """
     modes = min(modes, seq_len//2)
     if mode_select_method == 'random':
         index = list(range(0, seq_len // 2))
         np.random.shuffle(index)
         index = index[:modes]
-    else:
+    elif mode_select_method == 'top':
         index = list(range(0, modes))
+    else:
+        raise Exception(f'{mode_select_method} is not implemented. '
+                        'Please choose from "random" and "top".')
     index.sort()
+
     return index
 
 

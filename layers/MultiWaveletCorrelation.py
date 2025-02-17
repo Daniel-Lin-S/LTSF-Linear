@@ -6,12 +6,6 @@ from torch import Tensor
 
 from typing import List, Tuple
 import math
-from functools import partial
-from einops import rearrange, reduce, repeat
-from torch import nn, einsum, diagonal
-from math import log2, ceil
-import pdb
-from utils.masking import LocalMask
 from layers.utils import get_filter
 
 
@@ -62,13 +56,43 @@ class MultiWaveletCross(nn.Module):
     """
     1D Multiwavelet Cross Attention layer.
     """
-    def __init__(self, in_channels, out_channels, seq_len_q, seq_len_kv, modes, c=64,
-                 k=8, ich=512,
+    def __init__(self, in_channels: int, out_channels: int,
+                 seq_len_q: int, seq_len_kv: int,
+                 modes: int,
+                 c: int=64,
+                 k: int=8, ich: int=512,
                  L=0,
                  base='legendre',
                  mode_select_method='random',
-                 initializer=None, activation='tanh',
+                 activation='tanh',
                  **kwargs):
+        """
+        Parameters
+        ----------
+        in_channels, out_channels : int
+            Number of input and output channels.
+        seq_len_q : int
+            Length of query sequence.
+        seq_len_kv : int
+            Length of key and value sequences.
+        modes : int
+            Number of Fourier frequency components used.
+        c : int
+            Number of wavelet coefficients.
+        k : int
+            Number of wavelet scales.
+        ich : int
+            Number of attention keys (values).
+        L : int
+            Number of wavelet scales to skip.
+        base : str
+            Wavelet base. One of 'legendre', 'chebyshev'.
+        mode_select_method : str
+            Method for selecting Fourier modes.
+        activation : str
+            Activation function.
+            Choose from 'tanh', 'softmax'.
+        """
         super(MultiWaveletCross, self).__init__()
         print('base', base)
 

@@ -75,12 +75,12 @@ def get_pred_model_settings(args: argparse.Namespace) -> str:
             args.individual
         )
         if args.model == 'FDLinear':
-            additional_setting = 'nfft{}_hl{}'.format(
+            additional_setting = 'nfft{}_hoplen{}'.format(
                 args.nfft,
                 args.stft_hop_length
             )
         elif args.model == 'STFTLinear':
-            additional_setting = 'freqind{}_nfft{}_hl{}'.format(
+            additional_setting = 'freqind{}_nfft{}_hoplen{}'.format(
                 args.independent_freqs,
                 args.nfft,
                 args.stft_hop_length
@@ -88,25 +88,42 @@ def get_pred_model_settings(args: argparse.Namespace) -> str:
         else:
             additional_setting = None
     elif 'former' in args.model:
-        base_model_setting = 'dm{}_di{}_nh{}_el{}_dl{}_df{}_fc{}_et{}_do{}_act{}'.format(
+        base_model_setting = 'dim{}_nheads{}_enclayers{}_declayers{}_df{}_embedtype{}_dropout{}_act{}'.format(
             args.d_model,
             args.n_heads,
             args.e_layers,
             args.d_layers,
             args.d_ff,
-            args.factor,
             args.embed_type,
             args.dropout,
             args.activation
         )
-        if args.model == 'Informer':
-            additional_setting = 'dt{}'.format(
+        if args.model == 'Transformer':
+            additional_setting = 'attnfactor{}'.format(
+                args.factor,
+            )
+        elif args.model == 'Informer':
+            additional_setting = 'attnfactor{}_distil{}'.format(
+                args.factor,
                 args.distil
             )
         elif args.model == 'Autoformer':
-            additional_setting = 'mavg{}'.format(
+            additional_setting = 'attnfactor{}_mavg{}'.format(
+                args.factor,
                 args.moving_avg
             )
+        elif args.model == 'FEDformer':
+            additional_setting = 'version{}_modes{}_select{}'.format(
+                args.version,
+                args.modes,
+                args.mode_select
+            )
+            if args.version == 'Wavelets':
+                additional_setting += '_wvt{}_wvtskips{}_crossact{}'.format(
+                    args.base,   # the wavelet used
+                    args.L,      # the number of wavelet scales to skips
+                    args.cross_activation
+                )
         else:
             additional_setting = None
         

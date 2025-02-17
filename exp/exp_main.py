@@ -4,7 +4,7 @@ from exp.exp_basic import Exp_Basic
 from models import (
     Informer, Autoformer, Transformer,
     DLinear, Linear, NLinear, FDLinear,
-    STFTLinear
+    STFTLinear, PatchTST, FEDformer
 )
 from utils.tools import (
     EarlyStopping, adjust_learning_rate, visualise_results,
@@ -38,7 +38,9 @@ model_dict = {
     'NLinear': NLinear,
     'Linear': Linear,
     'FDLinear': FDLinear,
-    'STFTLinear': STFTLinear
+    'STFTLinear': STFTLinear,
+    'PatchTST': PatchTST,
+    'FEDformer': FEDformer
 }
 
 

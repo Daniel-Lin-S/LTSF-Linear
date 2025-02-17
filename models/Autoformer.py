@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 from layers.Embed import DataEmbedding, DataEmbedding_wo_pos,DataEmbedding_wo_pos_temp,DataEmbedding_wo_temp
 from layers.AutoCorrelation import AutoCorrelation, AutoCorrelationLayer
-from layers.Autoformer_EncDec import Encoder, Decoder, EncoderLayer, DecoderLayer, my_Layernorm, series_decomp
+from layers.Autoformer_EncDec import Encoder, Decoder, EncoderLayer, DecoderLayer, my_Layernorm
+from layers.Decompositions import SeasonTrendDecomp
 
 
 class Model(nn.Module):
@@ -19,7 +20,7 @@ class Model(nn.Module):
 
         # Decomp
         kernel_size = configs.moving_avg
-        self.decomp = series_decomp(kernel_size)
+        self.decomp = SeasonTrendDecomp(kernel_size)
 
         # Embedding
         # The series-wise connection inherently contains the sequential information.
