@@ -87,33 +87,42 @@ def get_pred_model_settings(args: argparse.Namespace) -> str:
             )
         else:
             additional_setting = None
-    elif 'former' in args.model:
-        base_model_setting = 'dim{}_nheads{}_enclayers{}_declayers{}_df{}_embedtype{}_dropout{}_act{}'.format(
+    elif 'former' in args.model or args.model == 'PatchTST':
+        base_model_setting = 'dim{}_nheads{}_enclayers{}_df{}_dropout{}'.format(
             args.d_model,
             args.n_heads,
             args.e_layers,
-            args.d_layers,
             args.d_ff,
-            args.embed_type,
-            args.dropout,
-            args.activation
+            args.dropout
         )
         if args.model == 'Transformer':
-            additional_setting = 'attnfactor{}'.format(
+            additional_setting = 'declayers{}_embedtype{}_act{}_attnfactor{}'.format(
+                args.d_layers,
+                args.embed_type,
+                args.activation,
                 args.factor,
             )
         elif args.model == 'Informer':
-            additional_setting = 'attnfactor{}_distil{}'.format(
+            additional_setting = 'declayers{}_embedtype{}_act{}_attnfactor{}_distil{}'.format(
+                args.d_layers,
+                args.embed_type,
+                args.activation,
                 args.factor,
                 args.distil
             )
         elif args.model == 'Autoformer':
-            additional_setting = 'attnfactor{}_mavg{}'.format(
+            additional_setting = 'declayers{}_embedtype{}_act{}_attnfactor{}_mavg{}'.format(
+                args.d_layers,
+                args.embed_type,
+                args.activation,
                 args.factor,
                 args.moving_avg
             )
         elif args.model == 'FEDformer':
-            additional_setting = 'version{}_modes{}_select{}'.format(
+            additional_setting = 'declayers{}_embedtype{}_act{}_version{}_modes{}_select{}'.format(
+                args.d_layers,
+                args.embed_type,
+                args.activation,
                 args.version,
                 args.modes,
                 args.mode_select
@@ -124,6 +133,18 @@ def get_pred_model_settings(args: argparse.Namespace) -> str:
                     args.L,      # the number of wavelet scales to skips
                     args.cross_activation
                 )
+        elif args.model == 'PatchTST':
+            additional_setting = 'ind{}_fcdropout{}_headdropout{}_patchlen{}_revin{}_affine{}_sublast{}_decomp{}_mvgkernel{}'.format(
+                args.individual,
+                args.fc_dropout,
+                args.head_dropout,
+                args.patch_len,
+                args.revin,
+                args.affine,
+                args.subtract_last,
+                args.decomposition,
+                args.kernel_size
+            )
         else:
             additional_setting = None
         

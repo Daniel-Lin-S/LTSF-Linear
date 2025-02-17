@@ -89,6 +89,13 @@ class PatchTST_backbone(nn.Module):
 
 class Flatten_Head(nn.Module):
     def __init__(self, individual, n_vars, nf, target_window, head_dropout=0):
+        """
+        Parameters
+        ----------
+        individual: bool
+            Whether to have an individual head for each variable (channel).
+        
+        """
         super().__init__()
         
         self.individual = individual

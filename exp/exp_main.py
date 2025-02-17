@@ -201,7 +201,7 @@ class Exp_Main(Exp_Basic):
 
     def _get_output(self, batch_x, batch_x_mark, dec_inp, batch_y_mark):
         """ Give the model required inputs """
-        if 'Linear' in self.args.model:
+        if 'Linear' in self.args.model or 'TST' in self.args.model:
             outputs = self.model(batch_x)
         else:
             if self.args.output_attention:
