@@ -1,3 +1,4 @@
+#!/bin/bash
 if [ ! -d "./logs" ]; then
     mkdir ./logs
 fi
@@ -13,7 +14,7 @@ for pred_len in 96 192 336 720; do
   for individual in True False; do
     exp_id="ETTh1_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_etth1_${seq_len}_${pred_len}.log"
-    command="python -u run_longExp.py \
+    COMMAND="python -u run_longExp.py \
     --root_path ./dataset/ETT-small/ \
     --data_path ETTh1.csv \
     --data ETTh1 \
@@ -33,14 +34,14 @@ for pred_len in 96 192 336 720; do
     --result_file DLinear_result.txt"
 
     if [ "$individual" = "True" ]; then
-      command="$command --individual"
+      COMMAND="$COMMAND --individual"
     fi
 
     eval $COMMAND
 
     exp_id="ETTh2_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_etth2_${seq_len}_${pred_len}.log"
-    command="python -u run_longExp.py \
+    COMMAND="python -u run_longExp.py \
     --root_path ./dataset/ETT-small/ \
     --data_path ETTh2.csv \
     --data ETTh2 \
@@ -60,14 +61,14 @@ for pred_len in 96 192 336 720; do
     --result_file DLinear_result.txt"
 
     if [ "$individual" = "True" ]; then
-      command="$command --individual"
+      COMMAND="$COMMAND --individual"
     fi
 
     eval $COMMAND
 
     exp_id="ETTm1_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_ettm1_${seq_len}_${pred_len}.log"
-    command="python -u run_longExp.py \
+    COMMAND="python -u run_longExp.py \
     --root_path ./dataset/ETT-small/ \
     --data_path ETTm1.csv \
     --data ETTm1 \
@@ -87,14 +88,14 @@ for pred_len in 96 192 336 720; do
     --result_file DLinear_result.txt"
 
     if [ "$individual" = "True" ]; then
-      command="$command --individual"
+      COMMAND="$COMMAND --individual"
     fi
 
     eval $COMMAND
 
     exp_id="ETTm2_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_ettm2_${seq_len}_${pred_len}.log"
-    command="python -u run_longExp.py \
+    COMMAND="python -u run_longExp.py \
     --root_path ./dataset/ETT-small/ \
     --data_path ETTm2.csv \
     --data ETTm2 \
@@ -111,10 +112,10 @@ for pred_len in 96 192 336 720; do
     --gpu $gpu_id \
     --itr $repeat \
     --log_file $log_file \
-    --result_file DLinear_result.txt"
+    --result_file DLinear_result.csv"
 
     if [ "$individual" = "True" ]; then
-      command="$command --individual"
+      COMMAND="$COMMAND --individual"
     fi
 
     eval $COMMAND

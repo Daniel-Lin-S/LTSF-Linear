@@ -1,3 +1,4 @@
+#!/bin/bash
 if [ ! -d "./logs" ]; then
     mkdir ./logs
 fi
@@ -13,7 +14,7 @@ for pred_len in 96 192 336 720; do
   for individual in True False; do
     exp_id="Weather_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_weather_${seq_len}_${pred_len}.log"
-    command="python -u run_longExp.py \
+    COMMAND="python -u run_longExp.py \
     --root_path ./dataset/weather/ \
     --data_path weather.csv \
     --data custom \
@@ -30,10 +31,10 @@ for pred_len in 96 192 336 720; do
     --gpu $gpu_id \
     --itr $repeat \
     --log_file $log_file \
-    --result_file DLinear_result.txt"
+    --result_file DLinear_result.csv"
 
     if [ "$individual" = "True" ]; then
-      command="$command --individual"
+      COMMAND="$COMMAND --individual"
     fi
 
     eval $COMMAND
