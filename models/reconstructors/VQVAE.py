@@ -7,11 +7,11 @@ from einops import rearrange
 import os
 
 from layers.VQVAE_EncDec import VQVAEEncoder, VQVAEDecoder
-from layers.vq import VectorQuantize
+from layers.VQ import VectorQuantize
 from utils.time_freq import (
     compute_downsample_rate,
     zero_pad_low_freq, zero_pad_high_freq,
-    quantize, stft_lfhf, plot_lfhf_reconstruction
+    quantize, stft_decomp, plot_lfhf_reconstruction
 )
 
 class VQVAE(nn.Module):
@@ -99,7 +99,7 @@ class VQVAE(nn.Module):
         x = rearrange(batch_x, 'b l c -> b c l')
 
         # Split low and high-frequency components
-        x_l, x_h = stft_lfhf(x, self.n_fft)
+        x_l, x_h = stft_decomp(x, self.n_fft)
 
         # Low-Frequency Path
         z_l = self.encoder_l(x)

@@ -94,7 +94,7 @@ parser.add_argument('--kernel_size', type=int, default=25,
                     help='moving average kernel size of the '
                     'decomposition module (season-trend)')
 
-# FDLinear and STFTLinear
+# FDLinear and TFLinear
 parser.add_argument('--stft_hop_length', type=int, default=4,
                     help='Hop length of sliding window for STFT')
 parser.add_argument('--nfft', type=int, default=8, help='Number of FFT points')

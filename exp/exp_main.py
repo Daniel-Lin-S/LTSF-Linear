@@ -2,9 +2,9 @@ from data_provider.data_factory import data_provider, DataLoader
 from data_provider.data_loader import Dataset
 from exp.exp_basic import Exp_Basic
 from models import (
-    Informer, Autoformer, Transformer,
+    Informer, Autoformer, TFLinear, Transformer,
     DLinear, Linear, NLinear, FDLinear,
-    STFTLinear, PatchTST, FEDformer
+    PatchTST, FEDformer
 )
 from utils.tools import (
     EarlyStopping, adjust_learning_rate, visualise_results,
@@ -38,7 +38,7 @@ model_dict = {
     'NLinear': NLinear,
     'Linear': Linear,
     'FDLinear': FDLinear,
-    'STFTLinear': STFTLinear,
+    'TFLinear': TFLinear,
     'PatchTST': PatchTST,
     'FEDformer': FEDformer
 }

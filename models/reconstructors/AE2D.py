@@ -8,7 +8,7 @@ from layers.VQVAE_EncDec import VQVAEEncoder, VQVAEDecoder
 from utils.time_freq import (
     compute_downsample_rate,
     zero_pad_low_freq, zero_pad_high_freq,
-    stft_lfhf
+    stft_decomp
 )
 from utils.tools import plot_reconstruction_for_channels
 
@@ -118,7 +118,7 @@ class AE2D(nn.Module):
 
         if self.separation:
             # Separate LF and HF components
-            x_l, x_h = stft_lfhf(x, self.n_fft)
+            x_l, x_h = stft_decomp(x, self.n_fft)
 
             # Encode and decode LF and HF components
             z_l = self.encoder_l(x_l)

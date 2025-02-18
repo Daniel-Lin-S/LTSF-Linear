@@ -1,6 +1,12 @@
 from torch import nn
 import torch
+import torch.nn.functional as F
 from typing import Tuple, List
+
+from utils.time_freq import (
+    time_to_timefreq, timefreq_to_time,
+    zero_pad_high_freq, zero_pad_low_freq
+)
 
     
 class moving_avg(nn.Module):
@@ -50,7 +56,7 @@ class SeasonTrendDecomp(nn.Module):
     """
     Season-trend decomposition.
     """
-    def __init__(self, kernel_size: int):
+    def __init__(self, kernel_size: int) -> None:
         """
         Parameters
         ----------
@@ -107,7 +113,8 @@ class MultiSeasonTrendDecomp(nn.Module):
         Return
         ------
         Tuple[torch.Tensor, torch.Tensor]
-            the season and trend components of the input
+            the season and trend components of the input.
+            Both of the same shape as input.
         """
         moving_mean=[]
         for func in self.moving_avg:
@@ -118,3 +125,94 @@ class MultiSeasonTrendDecomp(nn.Module):
             moving_mean*nn.Softmax(-1)(self.layer(x.unsqueeze(-1))),dim=-1)
         res = x - moving_mean
         return res, moving_mean 
+
+
+class FreqDecomp(nn.Module):
+    """
+    Split the input into high and low frequency components.
+    """
+    def __init__(
+            self, nfft: int, hop_length: int,
+            n_low_freqs: int = 1,
+            split_trend: bool = False
+            ):
+        """
+        Parameters
+        ----------
+        nfft: int
+            the size of the FFT window.
+        hop_length: int
+            the size of the hop length.
+        n_low_freqs: int, optional
+            The number of low frequency components to keep.
+            Default is 1.
+        split_trend: bool, optional
+            If true, only perform frequency decomposition
+            on the season component.
+        """
+        super(FreqDecomp, self).__init__()
+        if hop_length >= nfft:
+            raise AssertionError(
+                'hop_length must be shorter than nfft')
+        
+        if n_low_freqs >= nfft // 2 + 1:
+            raise AssertionError(
+                'n_low_freqs must be shorter than nfft // 2 '
+                f'(total number of frequency components) {nfft // 2 + 1}')
+        elif n_low_freqs < 1:
+            raise AssertionError(
+                'n_low_freqs must be at least 1')
+
+        self.nfft = nfft
+        self.hop_length = hop_length
+        self.n_low_freqs = n_low_freqs
+
+        if split_trend:
+            self.st_decomp = SeasonTrendDecomp(kernel_size=25)
+        else:
+            self.st_decomp = None
+    
+    def forward(self,
+            x: torch.Tensor
+        ) -> Tuple[torch.Tensor]:
+        """
+        Parameters
+        ----------
+        x : torch.Tensor
+            of shape (batch_size, length, channels)
+        
+        Return
+        ------
+        Tuple[torch.Tensor]
+            If split_trend is False,
+            return the low and high frequency components.
+            Otherwise, return the low frequency, high frequency,
+            and the trend component.
+        """
+        in_channels = x.shape[2]
+        input_length = x.shape[1]
+
+        if self.st_decomp:
+            x_season, x_trend = self.st_decomp(x)
+        else:
+            x_season = x  # (b l c)
+
+        x_season = x_season.permute(0, 2, 1)  # (b c l)
+        xf = time_to_timefreq(x_season, self.nfft, in_channels)  # (b 2c h w)
+
+        u_l = zero_pad_high_freq(xf, self.n_low_freqs)  # (b 2c h w)
+        x_l = F.interpolate(
+            timefreq_to_time(u_l, self.nfft, in_channels),
+            input_length, mode='linear')  # (b c l)
+        u_h = zero_pad_low_freq(xf, self.n_low_freqs)  # (b 2c h w)
+        x_h = F.interpolate(
+            timefreq_to_time(u_h, self.nfft, in_channels),
+            input_length, mode='linear')  # (b c l)
+        
+        x_l = x_l.permute(0, 2, 1)  # (b l c)
+        x_h = x_h.permute(0, 2, 1)  # (b l c)
+
+        if self.st_decomp:
+            return x_l, x_h, x_trend
+        else:
+            return x_l, x_h

@@ -10,7 +10,7 @@ from utils.time_freq import (
     compute_downsample_rate,
     zero_pad_low_freq, zero_pad_high_freq,
     plot_lfhf_reconstruction,
-    stft_lfhf
+    stft_decomp
 )
 from utils.tools import compute_kl_loss, plot_reconstruction_for_channels
 
@@ -194,7 +194,7 @@ class VAE2D(nn.Module):
 
         # separate low and high-frequency components
         if self.separation:
-            x_l, x_h = stft_lfhf(x, self.n_fft)
+            x_l, x_h = stft_decomp(x, self.n_fft)
 
             ### Convolution Encoding ###
             z_l = self.encoder_l(x)

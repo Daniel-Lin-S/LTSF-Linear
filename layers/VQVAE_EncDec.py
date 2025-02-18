@@ -5,7 +5,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 from typing import Optional
-from utils.time_freq import timefreq_to_time, time_to_timefreq, SnakeActivation
+from utils.time_freq import timefreq_to_time, time_to_timefreq
+from layers.Activations import SnakeActivation
 
 
 def get_stride(downsampling: str, downsample_ratio: int=2):
