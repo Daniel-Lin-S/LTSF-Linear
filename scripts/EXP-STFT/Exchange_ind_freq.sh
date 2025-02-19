@@ -16,7 +16,7 @@ for nfft in 8 16 32 64; do
     log_file="logs/STFT/${model_name}_I_exchange_336_${pred_len}.log"
     python -u run_longExp.py \
     --is_training 1 \
-    --root_path ./dataset/exchange_rate \
+    --root_path dataset \
     --data_path exchange_rate.csv \
     --exp_id $exp_id \
     --model TFLinear \
