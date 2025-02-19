@@ -13,6 +13,7 @@ class Model(nn.Module):
         super(Model, self).__init__()
         self.pred_len = configs.pred_len
         self.output_attention = configs.output_attention
+        self.requiree_time_markers = True
 
         # Embedding
         if configs.embed_type == 0:

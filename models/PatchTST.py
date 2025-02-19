@@ -20,6 +20,7 @@ class Model(nn.Module):
         c_in = configs.enc_in
         context_window = configs.seq_len
         target_window = configs.pred_len
+        self.requires_time_markers = False
         
         n_layers = configs.e_layers
         n_heads = configs.n_heads

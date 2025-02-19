@@ -23,6 +23,8 @@ class Model(nn.Module):
         self.pred_len = configs.pred_len
         self.output_attention = configs.output_attention
 
+        self.require_time_markers = True
+
         # Decomposition
         kernel_size = configs.moving_avg
         if isinstance(kernel_size, list):

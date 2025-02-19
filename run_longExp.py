@@ -33,7 +33,7 @@ parser.add_argument('--exp_id', type=str, required=True,
                     'Names of all folders and files will have this as a prefix')
 parser.add_argument('--model', type=str, required=True,
                     help='model name, options: [Autoformer, Informer, Transformer, '
-                    'DLinear, Linear, NLinear, STFTLinear, FDLinear]')
+                    'DLinear, Linear, NLinear, TFLinear, FDLinear]')
 parser.add_argument('--itr', type=int, default=2, help='number of experiment repetitions')
 parser.add_argument('--des', type=str, default='',
                     help='experiment description added at the end of folder name')
@@ -99,8 +99,17 @@ parser.add_argument('--stft_hop_length', type=int, default=4,
                     help='Hop length of sliding window for STFT')
 parser.add_argument('--nfft', type=int, default=8, help='Number of FFT points')
 parser.add_argument('--independent_freqs', action='store_true', default=False,
-                    help='For STFTLinear: whether to use separate linear models'
+                    help='For TFLinear: whether to use separate linear models'
                      ' for each frequency component.')
+parser.add_argument('--isolate_trend', action='store_true', default=False,
+                    help='For TFLinear: whether to predict trend independently')
+
+# TFHMM
+parser.add_argument('--n_states', type=int, default=5,
+                    help='Number of hidden states')
+parser.add_argument('--hid_dim', type=int, default=128,
+                    help='Number of hidden units in the MLP'
+                    ' used to learn state probabilities from emissions')
 
 # Formers 
 parser.add_argument('--embed_type', type=int, default=0,
@@ -108,8 +117,9 @@ parser.add_argument('--embed_type', type=int, default=0,
                     '1: value embedding + temporal embedding + positional embedding '
                     '2: value embedding + temporal embedding '
                     '3: value embedding + positional embedding 4: value embedding')
-# Linear models with --individual should use enc_in as the number of channels
-parser.add_argument('--enc_in', type=int, default=7, help='encoder input size') 
+parser.add_argument('--enc_in', type=int, default=7,
+                    help='Encoder input size. '
+                    'Also used by other models as the number of input channels')
 parser.add_argument('--dec_in', type=int, default=7, help='decoder input size')
 parser.add_argument('--c_out', type=int, default=7, help='output size')
 parser.add_argument('--d_model', type=int, default=512, help='dimension of model')
@@ -148,7 +158,7 @@ parser.add_argument('--cross_activation', type=str, default='tanh',
                     help='Multiwavelet cross atention activation function:'
                      'one of [tanh, softmax]')
 
-# optimization
+# optimization and training
 parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
 parser.add_argument('--train_epochs', type=int, default=10, help='train epochs')
 parser.add_argument('--batch_size', type=int, default=32, help='batch size of train input data')

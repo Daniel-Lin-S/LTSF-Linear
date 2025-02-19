@@ -16,6 +16,8 @@ class Model(nn.Module):
         self.pred_len = configs.pred_len
         self.output_attention = configs.output_attention
 
+        self.require_time_markers = True
+
         # Embedding
         if configs.embed_type == 0:
             self.enc_embedding = DataEmbedding(configs.enc_in, configs.d_model, configs.embed, configs.freq,

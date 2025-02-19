@@ -28,6 +28,8 @@ class Model(nn.Module):
         self.seq_len = configs.seq_len
         self.pred_len = configs.pred_len
 
+        self.requires_time_markers = False
+
         # Decompsition Kernel Size
         kernel_size = 25
         self.decompsition = SeasonTrendDecomp(kernel_size)

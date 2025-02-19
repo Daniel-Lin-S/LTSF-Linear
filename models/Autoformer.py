@@ -18,6 +18,8 @@ class Model(nn.Module):
         self.pred_len = configs.pred_len
         self.output_attention = configs.output_attention
 
+        self.requires_time_markers = True
+
         # Decomp
         kernel_size = configs.moving_avg
         self.decomp = SeasonTrendDecomp(kernel_size)

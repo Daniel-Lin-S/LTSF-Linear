@@ -25,7 +25,8 @@ class moving_avg(nn.Module):
         """
         super(moving_avg, self).__init__()
         self.kernel_size = kernel_size
-        self.avg = nn.AvgPool1d(kernel_size=kernel_size, stride=stride, padding=0)
+        self.avg = nn.AvgPool1d(
+            kernel_size=kernel_size, stride=stride, padding=0)
 
     def forward(self, x: torch.Tensor):
         """
@@ -42,14 +43,16 @@ class moving_avg(nn.Module):
             of the same shape as input
         """
         # padding on the both ends of time series to preserve length
-        front = x[:, 0:1, :].repeat(1, (self.kernel_size - 1) // 2, 1)
-        end = x[:, -1:, :].repeat(1, (self.kernel_size - 1) // 2, 1)
+        pad_left = (self.kernel_size - 1) // 2
+        pad_right = self.kernel_size - 1 - pad_left
+        front = x[:, 0:1, :].repeat(1, pad_left, 1)
+        end = x[:, -1:, :].repeat(1, pad_right, 1)
         x = torch.cat([front, x, end], dim=1)
 
         # take the average on temporal axis
-        x = self.avg(x.permute(0, 2, 1))
-        x = x.permute(0, 2, 1)
-        return x
+        x_mvg = self.avg(x.permute(0, 2, 1))
+        x_mvg = x_mvg.permute(0, 2, 1)
+        return x_mvg
 
 
 class SeasonTrendDecomp(nn.Module):
@@ -134,7 +137,8 @@ class FreqDecomp(nn.Module):
     def __init__(
             self, nfft: int, hop_length: int,
             n_low_freqs: int = 1,
-            split_trend: bool = False
+            isolate_trend: bool = False,
+            split_type: str = 'magnitude_phase'
             ):
         """
         Parameters
@@ -146,9 +150,14 @@ class FreqDecomp(nn.Module):
         n_low_freqs: int, optional
             The number of low frequency components to keep.
             Default is 1.
-        split_trend: bool, optional
+        isolate_trend: bool, optional
             If true, only perform frequency decomposition
-            on the season component.
+            on the season component. \n
+            Trend component will be returned as is.
+        split_type: str, optional
+            The method used to split complex numbers
+            in STFT. 
+            Default is 'magnitude_phase'.
         """
         super(FreqDecomp, self).__init__()
         if hop_length >= nfft:
@@ -164,30 +173,37 @@ class FreqDecomp(nn.Module):
                 'n_low_freqs must be at least 1')
 
         self.nfft = nfft
+        self.split_type = split_type
         self.hop_length = hop_length
         self.n_low_freqs = n_low_freqs
 
-        if split_trend:
+        if isolate_trend:
             self.st_decomp = SeasonTrendDecomp(kernel_size=25)
         else:
             self.st_decomp = None
-    
+
     def forward(self,
-            x: torch.Tensor
+            x: torch.Tensor,
+            restore_time: bool = False
         ) -> Tuple[torch.Tensor]:
         """
         Parameters
         ----------
         x : torch.Tensor
             of shape (batch_size, length, channels)
+        restore_time : bool, optional
+            If true, turn the frequency components
+            back to time domain.
         
         Return
         ------
         Tuple[torch.Tensor]
-            If split_trend is False,
+            If isolate_trend is False,
             return the low and high frequency components.
             Otherwise, return the low frequency, high frequency,
             and the trend component.
+            When restore_time = True, the Lf and Hf components
+            are restored to time domain.
         """
         in_channels = x.shape[2]
         input_length = x.shape[1]
@@ -198,19 +214,29 @@ class FreqDecomp(nn.Module):
             x_season = x  # (b l c)
 
         x_season = x_season.permute(0, 2, 1)  # (b c l)
-        xf = time_to_timefreq(x_season, self.nfft, in_channels)  # (b 2c h w)
+        xf = time_to_timefreq(
+            x_season, self.nfft, in_channels,
+            split_type=self.split_type)  # (b 2c h w)
 
         u_l = zero_pad_high_freq(xf, self.n_low_freqs)  # (b 2c h w)
-        x_l = F.interpolate(
-            timefreq_to_time(u_l, self.nfft, in_channels),
-            input_length, mode='linear')  # (b c l)
         u_h = zero_pad_low_freq(xf, self.n_low_freqs)  # (b 2c h w)
-        x_h = F.interpolate(
-            timefreq_to_time(u_h, self.nfft, in_channels),
-            input_length, mode='linear')  # (b c l)
-        
-        x_l = x_l.permute(0, 2, 1)  # (b l c)
-        x_h = x_h.permute(0, 2, 1)  # (b l c)
+
+        if restore_time:
+            x_l = F.interpolate(
+                timefreq_to_time(
+                    u_l, self.nfft, in_channels, split_type=self.split_type),
+                input_length, mode='linear')  # (b c l)
+            x_h = F.interpolate(
+                timefreq_to_time(
+                    u_h, self.nfft, in_channels, split_type=self.split_type),
+                input_length, mode='linear')  # (b c l)
+            
+            x_l = x_l.permute(0, 2, 1)  # (b l c)
+            x_h = x_h.permute(0, 2, 1)  # (b l c)
+
+        else:
+            x_l = u_l
+            x_h = u_h
 
         if self.st_decomp:
             return x_l, x_h, x_trend

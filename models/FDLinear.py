@@ -34,6 +34,8 @@ class Model(nn.Module):
         self.in_channels = configs.enc_in
         self.individual = configs.individual
 
+        self.requires_time_markers = False
+
         self.series_decomp = FreqDecomp(
             nfft=configs.nfft, hop_length=configs.stft_hop_length,
             n_low_freqs=max(int(configs.nfft / 8), 1),

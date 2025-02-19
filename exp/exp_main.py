@@ -4,7 +4,7 @@ from exp.exp_basic import Exp_Basic
 from models import (
     Informer, Autoformer, TFLinear, Transformer,
     DLinear, Linear, NLinear, FDLinear,
-    PatchTST, FEDformer
+    PatchTST, FEDformer, TFHMM
 )
 from utils.tools import (
     EarlyStopping, adjust_learning_rate, visualise_results,
@@ -40,7 +40,8 @@ model_dict = {
     'FDLinear': FDLinear,
     'TFLinear': TFLinear,
     'PatchTST': PatchTST,
-    'FEDformer': FEDformer
+    'FEDformer': FEDformer,
+    'TFHMM': TFHMM
 }
 
 
@@ -99,7 +100,7 @@ class Exp_Main(Exp_Basic):
         """
         super(Exp_Main, self).__init__(args, logger)
 
-    def _build_model(self, model_args=None):
+    def _build_model(self, model_args=None) -> nn.Module:
         args = model_args if model_args is not None else self.args
 
         if args.model not in model_dict:
@@ -201,15 +202,23 @@ class Exp_Main(Exp_Basic):
 
     def _get_output(self, batch_x, batch_x_mark, dec_inp, batch_y_mark):
         """ Give the model required inputs """
-        if 'Linear' in self.args.model or 'TST' in self.args.model:
-            outputs = self.model(batch_x)
-        else:
-            if self.args.output_attention:
+        if 'requires_time_markers' not in dir(self.model):
+            raise AttributeError(
+                f'The model {self.args.model} must have a `requires_time_markers` attribute'
+                ' to determine if time markers are required. '
+                'If true, input to forward will be (x, x_mark, dec_inp, y_mark).'
+                ' If false, input to forward will be (x) alone'
+            )
+
+        if self.model.requires_time_markers:
+            if 'output_attention' in dir(self.model) and self.model.output_attention:
                 outputs = self.model(
                     batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
             else:
                 outputs = self.model(
                     batch_x, batch_x_mark, dec_inp, batch_y_mark)
+        else:
+            outputs = self.model(batch_x)
 
         if outputs.shape[1] != self.args.pred_len:
             error_msg = (
