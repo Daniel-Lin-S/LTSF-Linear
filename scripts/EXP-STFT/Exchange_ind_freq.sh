@@ -19,7 +19,7 @@ for nfft in 8 16 32 64; do
     --root_path ./dataset/exchange_rate \
     --data_path exchange_rate.csv \
     --exp_id $exp_id \
-    --model STFTLinear \
+    --model TFLinear \
     --gpu $gpu_id \
     --des 'Exp' \
     --data custom \

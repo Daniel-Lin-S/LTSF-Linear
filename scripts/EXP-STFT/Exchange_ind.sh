@@ -20,7 +20,7 @@ for independent_freqs in False True; do
         --root_path ./dataset/exchange_rate \
         --data_path exchange_rate.csv \
         --exp_id $exp_id \
-        --model STFTLinear \
+        --model TFLinear \
         --gpu $gpu_id \
         --des 'Exp' \
         --data custom \

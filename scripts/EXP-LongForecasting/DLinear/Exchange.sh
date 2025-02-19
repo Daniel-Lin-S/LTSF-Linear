@@ -15,7 +15,7 @@ for pred_len in 96 192 336 720; do
     exp_id="Exchange_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_exchange_${seq_len}_${pred_len}.log"
     COMMAND="python -u run_longExp.py \
-    --root_path ./dataset/exchange_rate/ \
+    --root_path ./dataset/ \
     --data_path exchange_rate.csv \
     --data custom \
     --enc_in 8 \

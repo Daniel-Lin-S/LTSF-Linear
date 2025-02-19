@@ -15,7 +15,7 @@ for pred_len in 96 192 336 720; do
     exp_id="Traffic_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_traffic_${seq_len}_${pred_len}.log"
     COMMAND="python -u run_longExp.py \
-    --root_path ./dataset/traffic/ \
+    --root_path ./dataset/ \
     --data_path traffic.csv \
     --data custom \
     --enc_in 862 \

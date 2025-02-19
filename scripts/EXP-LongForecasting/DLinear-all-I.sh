@@ -13,7 +13,7 @@ for pred_len in 96 192 336 720
 do
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/electricity/ \
+  --root_path ./dataset/ \
   --data_path electricity.csv \
   --exp_id Electricity_$seq_len'_'$pred_len \
   --model $model_name \
@@ -30,7 +30,7 @@ python -u run_longExp.py \
 
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/traffic/ \
+  --root_path ./dataset/ \
   --data_path traffic.csv \
   --exp_id traffic_$seq_len'_'$pred_len \
   --model $model_name \
@@ -47,7 +47,7 @@ python -u run_longExp.py \
 
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/weather/ \
+  --root_path ./dataset/ \
   --data_path weather.csv \
   --exp_id weather_$seq_len'_'$pred_len \
   --model $model_name \
@@ -64,7 +64,7 @@ python -u run_longExp.py \
 
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/exchange_rate/ \
+  --root_path ./dataset/ \
   --data_path exchange_rate.csv \
   --exp_id Exchange_$seq_len'_'$pred_len \
   --model $model_name \
@@ -155,7 +155,7 @@ for pred_len in 24 36 48 60
 do
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/illness/ \
+  --root_path ./dataset/ \
   --data_path national_illness.csv \
   --exp_id national_illness_$seq_len'_'$pred_len \
   --model $model_name \

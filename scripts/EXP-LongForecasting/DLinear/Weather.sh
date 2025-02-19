@@ -15,7 +15,7 @@ for pred_len in 96 192 336 720; do
     exp_id="Weather_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_weather_${seq_len}_${pred_len}.log"
     COMMAND="python -u run_longExp.py \
-    --root_path ./dataset/weather/ \
+    --root_path ./dataset/ \
     --data_path weather.csv \
     --data custom \
     --enc_in 21 \

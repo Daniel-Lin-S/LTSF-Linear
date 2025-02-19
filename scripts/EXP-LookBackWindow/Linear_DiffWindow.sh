@@ -1,4 +1,4 @@
-model_name=DLinear   # Linear NLinear STFTLinear FDLinear
+model_name=DLinear   # Linear NLinear TFLinear FDLinear
 
 for pred_len in 24 720
 do

@@ -37,7 +37,7 @@ class Base_Dataset(Dataset, ABC):
         flag : str, optional, default 'train'
             The type of dataset to load, can be 'train', 'val', or 'test'.
         size : list of int or None
-            Specifies [seq_len, _, pred_len], where:
+            Specifies [seq_len, label_len, pred_len], where:
             - `seq_len` is the length of input sequences.
             - `label_len`: length of overlap for transformer
               based models.
@@ -212,7 +212,7 @@ class Base_Dataset(Dataset, ABC):
 
 class Dataset_ETT_hour(Base_Dataset):
     def __init__(self, root_path, flag='train', size=None,
-                 features='S', data_path='ETTh1.csv',
+                 features='M', data_path='ETTh1.csv',
                  target='OT', scale=True, timeenc=0, freq='h', train_only=False,
                  hop_length=1, mode='pred'):
         super().__init__(root_path, flag, size, features,
@@ -249,7 +249,7 @@ class Dataset_ETT_hour(Base_Dataset):
 
 class Dataset_ETT_minute(Base_Dataset):
     def __init__(self, root_path, flag='train', size=None,
-                 features='S', data_path='ETTm1.csv',
+                 features='M', data_path='ETTm1.csv',
                  target='OT', scale=True, timeenc=0, freq='t', train_only=False,
                  hop_length=1, mode='pred'):
         super().__init__(root_path, flag, size, features,
@@ -296,7 +296,7 @@ class Dataset_Custom(Base_Dataset):
     ['date', ...(other features), target feature]
     """
     def __init__(self, root_path, flag='train', size=None,
-                 features='S', data_path='ETTh1.csv',
+                 features='M', data_path='ETTh1.csv',
                  target='OT', scale=True, timeenc=0, freq='h', train_only=False,
                  hop_length=1, mode='pred'):
         super().__init__(root_path, flag, size, features,
@@ -355,7 +355,7 @@ class Dataset_Pred(Dataset):
     split.
     """
     def __init__(self, root_path, flag='pred', size=None,
-                 features='S', data_path='ETTh1.csv',
+                 features='M', data_path='ETTh1.csv',
                  target='OT', scale=True, inverse=False,
                  timeenc=0, freq='15min',
                  cols=None, train_only=False):

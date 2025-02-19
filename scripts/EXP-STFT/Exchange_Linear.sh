@@ -11,7 +11,7 @@ fi
 seq_len=336
 repeat=3
 gpu_id=0
-for model_name in FDLinear STFTLinear
+for model_name in FDLinear TFLinear
 do 
 for pred_len in 96 192 336 720
 do
@@ -19,7 +19,7 @@ for nfft in 8 16 32
 do
 python -u run_longExp.py \
   --is_training 1 \
-  --root_path ./dataset/exchange_rate/ \
+  --root_path ./dataset/ \
   --data_path exchange_rate.csv \
   --exp_id Exchange_$seq_len'_'$pred_len'_nfft'$nfft \
   --model $model_name \

@@ -15,7 +15,7 @@ for pred_len in 24 36 48 60; do
     exp_id="Illness_${seq_len}_${pred_len}_ind${individual}"
     log_file="logs/LongForecasting/${model_name}_illness_${seq_len}_${pred_len}.log"
     COMMAND="python -u run_longExp.py \
-    --root_path ./dataset/illness/ \
+    --root_path ./dataset/ \
     --data_path national_illness.csv \
     --data custom \
     --enc_in 7 \
