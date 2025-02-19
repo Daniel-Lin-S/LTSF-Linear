@@ -11,69 +11,159 @@ from scipy.special import eval_legendre
 from sympy import Poly, legendre, Symbol, chebyshevt
 
 
-def compute_downsample_rate(
-        input_length: int,
-        n_fft: int,
-        downsampled_width: int,
-        downsampling: str='time',
-        return_width: bool=False) -> int:
+class STFT:
     """
-    Compute the downsampling rate for
-    the PixelCNN architecture in VQVAE.
+    For performing short-time Fourier transform (STFT)
+    and its inverse transformation
+    on a batch of time series.
 
-    :param input_length: length of input sequence
-    :param n_fft: number of FFT points used in STFT
-    :param downsampled_width: the temporal width of encoded vector.
-      Actual width might be slightly longer due to rounding
-    :param downsampling: strategy of downsampling
-      one of ['time', 'freq']
-    :param return_width: if true, return
-      the estimated actual width of encoded vector.
-
-    :return int: corresponding downsampling rate.
-    :return tuple: actual down-sampled height and width,
-      if return_size=True
-
-    Notes
-    -----
-    - This fuction assumes STFT uses default hop length
-    - and downsampling ratio is 2.
+    Attributes
+    ----------
+    n_freqs : int
+        number of frequency components
+    in_channels : int
+        Number of input channels
+    window : torch.Tensor
+        The Hann window used for STFT.
     """
-    # default hop length assumed
-    stft_length = np.ceil(
-        (input_length - n_fft) / np.floor(n_fft / 4)) + 5
+    def __init__(
+            self, n_fft: int,
+            hop_length: int,
+            split_type: str='real_imag',
+            normalize: bool=True
+        ):
+        """
+        Parameters
+        ----------
+        n_fft : int
+            Number of FFT points to use.
+        hop_length : int
+            Hop length for the STFT.
+        split_type : str
+            The method used to split
+            complex numbers in STFT.
+            One of 'real_imag', 
+            'magnitude_phase', and 'none'.
+        normalize : bool
+            If True, perform normalised STFT.
+        """
+        super(STFT, self).__init__()
+        if hop_length >= n_fft:
+            raise AssertionError(
+                'hop_length cannot be longer than n_fft')
+        
+        if split_type not in ['real_imag', 'magnitude_phase', 'none']:
+            raise ValueError(
+                'split_type must be one of real_imag, '
+                'magnitude_phase, none')
+
+        self.n_fft = n_fft
+        self.n_freqs = n_fft // 2 + 1
+        self.hop_length = hop_length
+        self.split_type = split_type
+        self.normalize = normalize
+
+        self.in_channels = None
+        self.window = None
+
+    def transform(
+            self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Perform STFT on the input time series.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            of shape (batch_size, length, channels),
+            the input time series.
+
+        Returns
+        -------
+        torch.Tensor
+            the STFT representation of x.
+            Of shape (batch_size, channels, n_freqs, time)
+            if split_type is 'none'. Otherwise, has shape
+            (batch_size, 2*channels, n_freqs, time).
+        """
+        self.in_channels = x.shape[2]
+        self.window = torch.hann_window(
+            window_length=self.n_fft, device=x.device)
+
+        x = rearrange(x, 'b l c -> (b c) l')
+
+        xf = torch.stft(
+            x, self.n_fft, self.hop_length,
+            window=self.window, normalized=self.normalize,
+            return_complex=True)
+        
+        if self.split_type == 'real_imag':
+            # Split into real and imaginary parts
+            xf = torch.view_as_real(xf)
+            xf = rearrange(
+                xf, '(b c) n t z -> b (c z) n t',  # z=2 (real, imag)
+                c=self.in_channels)  
+        elif self.split_type == 'magnitude_phase':
+            # Split into magnitude and phase (argument)
+            magnitude = torch.abs(xf)
+            argument = torch.angle(xf)
+
+            xf = torch.stack([magnitude, argument], dim=-3)
+        elif self.split_type == 'none':
+            # return the complex-valued tensor as-is
+            xf = rearrange(xf, '(b c) n t -> b c n t', c=self.in_channels)
+
+        return xf
+        
+    def inverse_transform(
+            self, xf: torch.Tensor) -> torch.Tensor:
+        """
+        Perform inverse STFT on the input frequency-domain tensor.
+
+        Parameters
+        ----------
+        xf : torch.Tensor
+            of shape (batch_size, channels, n_freqs, time),
+            the frequency-domain representation of the input.
+
+        Returns
+        -------
+        torch.Tensor
+            the restored time domain representation of x.
+            Of shape (batch_size, length, channels).
+        """
+        if self.in_channels is None or self.window is None:
+            raise RuntimeError(
+                'Please call transform method first. '
+            )
+        if xf.shape[1] != 2 * self.in_channels:
+            raise ValueError(
+                'The second axis of xf does not match '
+                'input channels when transform is called, '
+                f'got {xf.shape[1]}, expecting {self.in_channels * 2}')
+        
+        if self.split_type == 'real_imag':
+            # Real and Imaginary split
+            xf = rearrange(xf, 'b (c z) n t -> (b c) n t z',
+                           c=self.in_channels).contiguous()
+            xf = torch.view_as_complex(xf)
+        elif self.split_type == 'magnitude_phase':
+            xf = rearrange(xf, 'b (c z) n t -> (b c) n t z',
+                           c=self.in_channels).contiguous()
+            magnitude, phase = x[..., 0], x[..., 1]
+            # Rebuild the complex representation
+            real = magnitude * torch.cos(phase)
+            imag = magnitude * torch.sin(phase)
+            xf = torch.stack([real, imag], dim=-1)
+            xf = torch.view_as_complex(xf)
+        elif self.split_type == 'none':
+            xf = xf.contiguous()
+
+        x = torch.istft(xf, self.n_fft, hop_length=self.hop_length,
+                        normalized=self.normalize,
+                       window=self.window)
     
-    freqs = round(n_fft / 2) + 1  # number of frequency bins
-
-    if downsampling == 'time':
-        init_width = stft_length
-    elif downsampling == 'freq':
-        init_width = freqs
-    else:
-        raise NotImplementedError(
-            'downsampling strategy other than'
-            "'time' and 'freq' is not implemented yet"
-        )
-
-    downsample_rate = round(
-        init_width / downsampled_width) if (
-            stft_length >= downsampled_width) else 1
-
-    downsample_rounds = max(1, int(round(np.log2(downsample_rate))))
-    actual_downsampled_width = round(init_width / (2**downsample_rounds))
-
-    # for the shortest possible length, convolution is handled differently.
-    if actual_downsampled_width == 4:
-        if downsampling == 'time':
-            actual_downsampled_width -= 1
-        if downsampling == 'freq':
-            actual_downsampled_width += 1
-
-    if return_width:
-        return downsample_rate, actual_downsampled_width
-    else:
-        return downsample_rate
-    
+        return rearrange(x, '(b c) l -> b l c', c=self.in_channels)
+        
 
 def time_to_timefreq(
         x: torch.Tensor, n_fft: int,
@@ -237,6 +327,49 @@ def timefreq_to_time(
 
     return x
     
+
+def plot_timefreq(xf: torch.Tensor, split_type: str):
+    """
+    Plot the time-frequency representation.
+
+    Parameters
+    ----------
+    xf : torch.Tensor
+        A tensor of shape (2, T, F) representing the complex frequency components.
+    split_type : str
+        The method used to split complex numbers in STFT.
+        Determines how the first axis of xf is interpreted.
+    """
+    if xf.shape[0] != 2:
+        raise ValueError(
+            "xf must have shape (2, T, F), "
+            "where the first axis holds two components.")
+    
+    _, axs = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+    im1 = axs[0].imshow(xf[0].numpy(), aspect='auto', origin='lower', cmap='jet')
+    if split_type == 'real_imag':
+        axs[0].set_title('Real Part of Frequency Components')
+    elif split_type == 'magnitude_phase':
+        axs[0].set_title('Magnitude of Frequency Components')
+
+    axs[0].set_xlabel('Time')
+    axs[0].set_ylabel('Frequency')
+    plt.colorbar(im1, ax=axs[0], orientation='vertical')
+    
+    # Plot imaginary part on the second subplot
+    im2 = axs[1].imshow(xf[1].numpy(), aspect='auto', origin='lower', cmap='jet')
+    if split_type == 'real_imag':
+        axs[1].set_title('Imaginary Part of Frequency Components')
+    elif split_type == 'magnitude_phase':
+        axs[1].set_title('Phase of Frequency Components')
+
+    axs[1].set_xlabel('Time')
+    axs[1].set_ylabel('Frequency')
+    plt.colorbar(im2, ax=axs[1], orientation='vertical')
+
+    plt.tight_layout()
+    plt.show()
+
 
 def zero_pad_high_freq(
         xf: torch.Tensor,
@@ -443,6 +576,70 @@ def plot_lfhf_reconstruction(x_l, xhat_l, x_h, xhat_h,
         plt.show()
     
     plt.close()
+
+
+def compute_downsample_rate(
+        input_length: int,
+        n_fft: int,
+        downsampled_width: int,
+        downsampling: str='time',
+        return_width: bool=False) -> int:
+    """
+    Compute the downsampling rate for
+    the PixelCNN architecture in VQVAE.
+
+    :param input_length: length of input sequence
+    :param n_fft: number of FFT points used in STFT
+    :param downsampled_width: the temporal width of encoded vector.
+      Actual width might be slightly longer due to rounding
+    :param downsampling: strategy of downsampling
+      one of ['time', 'freq']
+    :param return_width: if true, return
+      the estimated actual width of encoded vector.
+
+    :return int: corresponding downsampling rate.
+    :return tuple: actual down-sampled height and width,
+      if return_size=True
+
+    Notes
+    -----
+    - This fuction assumes STFT uses default hop length
+    - and downsampling ratio is 2.
+    """
+    # default hop length assumed
+    stft_length = np.ceil(
+        (input_length - n_fft) / np.floor(n_fft / 4)) + 5
+    
+    freqs = round(n_fft / 2) + 1  # number of frequency bins
+
+    if downsampling == 'time':
+        init_width = stft_length
+    elif downsampling == 'freq':
+        init_width = freqs
+    else:
+        raise NotImplementedError(
+            'downsampling strategy other than'
+            "'time' and 'freq' is not implemented yet"
+        )
+
+    downsample_rate = round(
+        init_width / downsampled_width) if (
+            stft_length >= downsampled_width) else 1
+
+    downsample_rounds = max(1, int(round(np.log2(downsample_rate))))
+    actual_downsampled_width = round(init_width / (2**downsample_rounds))
+
+    # for the shortest possible length, convolution is handled differently.
+    if actual_downsampled_width == 4:
+        if downsampling == 'time':
+            actual_downsampled_width -= 1
+        if downsampling == 'freq':
+            actual_downsampled_width += 1
+
+    if return_width:
+        return downsample_rate, actual_downsampled_width
+    else:
+        return downsample_rate
 
 
 def quantize(z: torch.Tensor, vq_model,

@@ -79,9 +79,10 @@ def get_pred_model_settings(args: argparse.Namespace) -> str:
                 args.nfft,
                 args.stft_hop_length
             )
-        elif args.model == 'STFTLinear':
-            additional_setting = 'freqind{}_nfft{}_hoplen{}'.format(
+        elif args.model == 'TFLinear':
+            additional_setting = 'freqind{}_trend{}_nfft{}_hoplen{}'.format(
                 args.independent_freqs,
+                args.isolate_trend,
                 args.nfft,
                 args.stft_hop_length
             )
@@ -129,12 +130,12 @@ def get_pred_model_settings(args: argparse.Namespace) -> str:
             )
             if args.version == 'Wavelets':
                 additional_setting += '_wvt{}_wvtskips{}_crossact{}'.format(
-                    args.base,   # the wavelet used
-                    args.L,      # the number of wavelet scales to skips
-                    args.cross_activation
+                    args.base,                  # the wavelet used
+                    args.L,                     # the number of wavelet scales to skips
+                    args.cross_activation       # the activation function for the cross-attention
                 )
         elif args.model == 'PatchTST':
-            additional_setting = 'ind{}_fcdropout{}_headdropout{}_patchlen{}_revin{}_affine{}_sublast{}_decomp{}_mvgkernel{}'.format(
+            additional_setting = 'ind{}_fcdropout{}_headdropout{}_patchlen{}_revin{}_affine{}_sublast{}_decomp{}_mvglen{}'.format(
                 args.individual,
                 args.fc_dropout,
                 args.head_dropout,
@@ -147,6 +148,15 @@ def get_pred_model_settings(args: argparse.Namespace) -> str:
             )
         else:
             additional_setting = None
+    elif args.model == 'TFHMM':
+        base_model_setting = 'states{}_hiddim{}_nfft{}_hoplen{}_mvglen{}'.format(
+            args.n_states,              # number of hidden states
+            args.hid_dim,               # hidden dimension for MLP state probability model
+            args.nfft,
+            args.stft_hop_length,
+            args.kernel_size,           # for trend decomposition
+        )
+        additional_setting = None
         
     if additional_setting:
         return f'{base_model_setting}_{additional_setting}'
